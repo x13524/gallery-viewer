@@ -40,6 +40,16 @@
           支持点击目录快速切换浏览范围，适合查看层级较深的大型项目素材目录。
         </div>
         <div id="folderList"></div>
+        <section id="currentLevelPanel" class="current-level-panel" hidden>
+          <div class="current-level-head">
+            <span class="group-label">当前层级</span>
+            <span id="currentLevelCount" class="current-level-count">0 个子文件夹</span>
+          </div>
+          <p id="currentLevelSummary" class="current-level-summary">
+            选择目录后，这里会显示当前目录的直接子文件夹。
+          </p>
+          <div id="currentLevelList" class="current-level-list"></div>
+        </section>
       </aside>
 
       <main id="main">
