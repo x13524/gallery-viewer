@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gallery Viewer - Hybrid Folder Navigation Sketch</title>
+    <style>
+      :root {
+        --bg: #06080d;
+        --panel: #0c111b;
+        --panel-2: #111827;
+        --panel-3: #151d2b;
+        --line: rgba(255, 255, 255, 0.08);
+        --line-soft: rgba(255, 255, 255, 0.045);
+        --text: #f5f7fb;
+        --muted: #a8b2c3;
+        --soft: #697587;
+        --accent: #8793ff;
+        --accent-2: #58c7ff;
+        --good: #7dd3a8;
+        --warn: #f6c56f;
+        --radius: 18px;
+        --shadow: 0 26px 80px rgba(0, 0, 0, 0.36);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 70% -12%, rgba(135, 147, 255, 0.16), transparent 34%),
+          radial-gradient(circle at 10% 6%, rgba(88, 199, 255, 0.09), transparent 28%),
+          linear-gradient(180deg, #0a0f18, var(--bg));
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        color: inherit;
+        cursor: pointer;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .page {
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 26px;
+      }
+
+      .hero {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 20px;
+      }
+
+      .kicker {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        font-size: clamp(30px, 4.6vw, 52px);
+        line-height: 0.98;
+        letter-spacing: -0.055em;
+      }
+
+      .subtitle {
+        max-width: 680px;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .badges {
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .badge,
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        color: rgba(245, 247, 251, 0.72);
+        background: rgba(255, 255, 255, 0.055);
+        font-size: 12px;
+      }
+
+      .note-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        margin: 0 0 12px;
+        color: var(--soft);
+        font-size: 12px;
+      }
+
+      .mock-shell {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: #070a10;
+        box-shadow: var(--shadow);
+      }
+
+      .app-sketch {
+        height: 780px;
+        display: grid;
+        grid-template-columns: 292px minmax(0, 1fr) 320px;
+        background:
+          radial-gradient(circle at 56% 0%, rgba(135, 147, 255, 0.1), transparent 34%),
+          #070a10;
+      }
+
+      .side {
+        min-width: 0;
+        padding: 15px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: rgba(5, 8, 14, 0.82);
+        border-right: 1px solid var(--line-soft);
+      }
+
+      .side-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .tiny {
+        color: var(--soft);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .side-title {
+        margin-top: 3px;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+
+      .mode-toggle,
+      .actions,
+      .segments {
+        display: flex;
+        gap: 7px;
+      }
+
+      .icon-btn {
+        width: 32px;
+        height: 32px;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--muted);
+        transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+      }
+
+      .icon-btn.active,
+      .icon-btn:hover {
+        color: #fff;
+        background: rgba(135, 147, 255, 0.18);
+        border-color: rgba(135, 147, 255, 0.24);
+      }
+
+      .icon-btn::before {
+        content: attr(data-icon);
+        font-size: 13px;
+      }
+
+      .side-hint {
+        padding: 10px 11px;
+        border-radius: 15px;
+        background: rgba(255, 255, 255, 0.035);
+        color: rgba(168, 178, 195, 0.82);
+        font-size: 11px;
+        line-height: 1.55;
+      }
+
+      .side-section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 2px 2px 6px;
+        color: var(--soft);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .folder-list,
+      .children-list {
+        display: grid;
+        gap: 4px;
+      }
+
+      .folder-item,
+      .child-card {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid transparent;
+        color: var(--muted);
+        background: transparent;
+        text-align: left;
+        transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+      }
+
+      .folder-item {
+        position: relative;
+        min-height: 34px;
+        display: grid;
+        grid-template-columns: 13px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        padding: 0 9px 0 calc(9px + var(--depth, 0) * 14px);
+        border-radius: 12px;
+      }
+
+      .folder-item::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(-45deg);
+        opacity: 0.32;
+      }
+
+      .folder-item.has-children.expanded::before {
+        transform: rotate(45deg) translateY(-2px);
+      }
+
+      .folder-item:hover,
+      .child-card:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.055);
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+
+      .folder-item.active {
+        color: #fff;
+        background: rgba(135, 147, 255, 0.15);
+        border-color: rgba(135, 147, 255, 0.24);
+        box-shadow: inset 0 0 0 1px rgba(135, 147, 255, 0.08);
+      }
+
+      .folder-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .count {
+        color: rgba(168, 178, 195, 0.72);
+        font-size: 10px;
+      }
+
+      .current-level {
+        margin-top: 3px;
+        padding: 10px;
+        border-radius: 17px;
+        background: rgba(255, 255, 255, 0.032);
+        border: 1px solid rgba(255, 255, 255, 0.055);
+      }
+
+      .current-summary {
+        margin-bottom: 8px;
+        color: rgba(245, 247, 251, 0.78);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .child-card {
+        min-height: 38px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        padding: 0 10px;
+        border-radius: 13px;
+      }
+
+      .child-card strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+      }
+
+      .flat-note {
+        padding: 10px;
+        border-radius: 15px;
+        color: rgba(168, 178, 195, 0.78);
+        background: rgba(135, 147, 255, 0.08);
+        font-size: 11px;
+        line-height: 1.55;
+      }
+
+      .main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .topbar {
+        padding: 10px 16px 9px;
+        border-bottom: 1px solid var(--line-soft);
+        background: rgba(7, 10, 16, 0.9);
+      }
+
+      .top-row {
+        display: grid;
+        grid-template-columns: auto minmax(160px, 1fr) minmax(220px, 330px) auto;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .primary {
+        height: 36px;
+        padding: 0 15px;
+        border: 0;
+        border-radius: 999px;
+        color: #111722;
+        background: #f1f4ff;
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .path {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: rgba(245, 247, 251, 0.74);
+        font-size: 12px;
+      }
+
+      .search {
+        height: 36px;
+        display: flex;
+        align-items: center;
+        padding: 0 13px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--soft);
+        font-size: 12px;
+      }
+
+      .filter-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 8px;
+      }
+
+      .quiet-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        color: rgba(168, 178, 195, 0.72);
+        font-size: 11px;
+      }
+
+      .segment {
+        min-height: 26px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .segment.active {
+        color: #fff;
+        background: rgba(135, 147, 255, 0.2);
+      }
+
+      .gallery-area {
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+        padding: 19px 22px 22px;
+      }
+
+      .gallery-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 14px;
+      }
+
+      .gallery-head h2 {
+        font-size: 18px;
+        letter-spacing: -0.025em;
+      }
+
+      .gallery-head p {
+        margin-top: 4px;
+        color: var(--soft);
+        font-size: 12px;
+      }
+
+      .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        min-width: 0;
+        padding: 3px;
+        border-radius: 18px;
+        background: transparent;
+      }
+
+      .card.selected {
+        background: rgba(135, 147, 255, 0.13);
+        outline: 1px solid rgba(135, 147, 255, 0.6);
+      }
+
+      .thumb {
+        position: relative;
+        height: 150px;
+        overflow: hidden;
+        border-radius: 16px;
+        background:
+          linear-gradient(135deg, rgba(135, 147, 255, 0.2), transparent 42%),
+          linear-gradient(160deg, #222b3d, #10141d);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      }
+
+      .thumb.warm {
+        background:
+          linear-gradient(135deg, rgba(246, 197, 111, 0.2), transparent 42%),
+          linear-gradient(160deg, #2a2117, #10141d);
+      }
+
+      .thumb.cold {
+        background:
+          linear-gradient(135deg, rgba(88, 199, 255, 0.18), transparent 42%),
+          linear-gradient(160deg, #142938, #10141d);
+      }
+
+      .thumb.tall {
+        background:
+          linear-gradient(90deg, transparent 34%, rgba(255, 255, 255, 0.08) 35%, rgba(255, 255, 255, 0.08) 64%, transparent 65%),
+          linear-gradient(160deg, #1d2534, #10141d);
+      }
+
+      .format {
+        position: absolute;
+        top: 9px;
+        right: 9px;
+        padding: 4px 7px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.52);
+        color: rgba(255, 255, 255, 0.86);
+        font-size: 10px;
+        font-weight: 750;
+      }
+
+      .play {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.48);
+      }
+
+      .play::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 53%;
+        border-top: 10px solid transparent;
+        border-bottom: 10px solid transparent;
+        border-left: 15px solid rgba(255, 255, 255, 0.92);
+        transform: translate(-35%, -50%);
+      }
+
+      .card-meta {
+        padding: 9px 2px 0;
+      }
+
+      .name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .meta-line {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 5px;
+        color: rgba(168, 178, 195, 0.62);
+        font-size: 10px;
+      }
+
+      .detail {
+        padding: 14px;
+        background: rgba(5, 8, 14, 0.82);
+        border-left: 1px solid var(--line-soft);
+      }
+
+      .detail-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+
+      .detail-top h3 {
+        font-size: 14px;
+      }
+
+      .preview {
+        height: 220px;
+        border-radius: 18px;
+        background:
+          linear-gradient(135deg, rgba(135, 147, 255, 0.16), transparent 42%),
+          #10141d;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      }
+
+      .detail-name {
+        margin: 12px 0 4px;
+        font-weight: 750;
+        line-height: 1.45;
+      }
+
+      .detail-path {
+        color: var(--soft);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .info-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .info-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .info-row strong {
+        color: var(--text);
+        font-weight: 650;
+      }
+
+      .design-notes {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .note-card {
+        padding: 15px;
+        border: 1px solid var(--line-soft);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .note-card b {
+        display: block;
+        margin-bottom: 7px;
+        font-size: 13px;
+      }
+
+      .note-card p {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 1160px) {
+        .hero,
+        .note-bar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .badges {
+          justify-content: flex-start;
+        }
+
+        .app-sketch {
+          grid-template-columns: 250px minmax(0, 1fr);
+        }
+
+        .detail {
+          display: none;
+        }
+
+        .gallery-grid,
+        .design-notes {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          padding: 18px;
+        }
+
+        .app-sketch {
+          height: auto;
+          grid-template-columns: 1fr;
+        }
+
+        .side {
+          min-height: 360px;
+        }
+
+        .top-row {
+          grid-template-columns: 1fr;
+        }
+
+        .filter-row {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .gallery-grid,
+        .design-notes {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <p class="kicker">Gallery Viewer / Hybrid Folder Navigation</p>
+          <h1>左侧混合目录导航草图</h1>
+          <p class="subtitle">
+            方案 C：默认保留轻量树形结构，同时在选中目录后突出当前层级子文件夹。
+            平铺视图不会删除，而是作为快速查找全局素材目录的辅助模式。
+          </p>
+        </div>
+        <div class="badges">
+          <span class="badge">可交互草图</span>
+          <span class="badge">保留平铺</span>
+          <span class="badge">轻量树</span>
+          <span class="badge">不动业务逻辑</span>
+        </div>
+      </section>
+
+      <div class="note-bar">
+        <span>试试点击左侧目录、当前层级卡片，以及树/平铺切换按钮。</span>
+        <span class="pill" id="modeCopy">当前：轻量树 + 当前层级</span>
+      </div>
+
+      <section class="mock-shell">
+        <div class="app-sketch">
+          <aside class="side">
+            <div class="side-head">
+              <div>
+                <div class="tiny">LIBRARY</div>
+                <h2 class="side-title">文件夹</h2>
+              </div>
+              <div class="mode-toggle" role="group" aria-label="目录视图">
+                <button class="icon-btn active" id="treeMode" type="button" data-icon="树" title="轻量树 + 当前层级"></button>
+                <button class="icon-btn" id="flatMode" type="button" data-icon="铺" title="全局平铺"></button>
+              </div>
+            </div>
+
+            <p class="side-hint" id="sideHint">
+              树形负责保留结构感；下方“当前层级”负责降低深层目录查找成本。
+            </p>
+
+            <div>
+              <div class="side-section-title">
+                <span id="listTitle">目录结构</span>
+                <span id="listMeta">轻量</span>
+              </div>
+              <div class="folder-list" id="folderList"></div>
+            </div>
+
+            <section class="current-level" id="currentLevel">
+              <div class="side-section-title">
+                <span>当前层级</span>
+                <span id="childMeta">3 个子文件夹</span>
+              </div>
+              <p class="current-summary" id="currentSummary">Assets 的直接子文件夹会在这里高亮展示。</p>
+              <div class="children-list" id="childrenList"></div>
+            </section>
+          </aside>
+
+          <section class="main">
+            <header class="topbar">
+              <div class="top-row">
+                <button class="primary" type="button">打开文件夹</button>
+                <div class="path" id="pathText">Assets / UI Screens</div>
+                <div class="search">搜索文件名、后缀</div>
+                <div class="actions">
+                  <button class="icon-btn active" type="button" data-icon="详" title="详情"></button>
+                  <button class="icon-btn" type="button" data-icon="设" title="设置"></button>
+                </div>
+              </div>
+              <div class="filter-row">
+                <div class="quiet-stats">
+                  <span id="fileStat">46 个文件</span>
+                  <span>已选中 1</span>
+                  <span>缓存 42 MB</span>
+                </div>
+                <div class="segments">
+                  <span class="segment active">全部</span>
+                  <span class="segment">图片</span>
+                  <span class="segment">视频</span>
+                  <span class="segment">包含子目录</span>
+                  <span class="segment">名称 ↑</span>
+                </div>
+              </div>
+            </header>
+
+            <div class="gallery-area">
+              <div class="gallery-head">
+                <div>
+                  <h2 id="galleryTitle">UI Screens</h2>
+                  <p id="galleryDesc">当前选中目录的媒体内容是视觉主体。</p>
+                </div>
+                <span class="pill" id="folderBadge">Assets / UI Screens</span>
+              </div>
+              <div class="gallery-grid" id="galleryGrid"></div>
+            </div>
+          </section>
+
+          <aside class="detail">
+            <div class="detail-top">
+              <h3>文件信息</h3>
+              <button class="icon-btn" type="button" data-icon="×" title="关闭"></button>
+            </div>
+            <div class="preview" id="detailPreview"></div>
+            <div class="detail-name" id="detailName">onboarding_empty_state.png</div>
+            <div class="detail-path" id="detailPath">Assets / UI Screens</div>
+            <div class="info-list">
+              <div class="info-row"><span>格式</span><strong id="detailType">图片 PNG</strong></div>
+              <div class="info-row"><span>大小</span><strong id="detailSize">428 KB</strong></div>
+              <div class="info-row"><span>分辨率</span><strong id="detailRes">1440 x 900</strong></div>
+              <div class="info-row"><span>修改时间</span><strong>今天 18:42</strong></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="design-notes">
+        <article class="note-card">
+          <b>默认不删平铺</b>
+          <p>平铺模式仍然作为全局查找入口，只是默认模式改为更稳的混合导航。</p>
+        </article>
+        <article class="note-card">
+          <b>树形更安静</b>
+          <p>减少树线和重边框，用缩进、hover、active 表达结构关系。</p>
+        </article>
+        <article class="note-card">
+          <b>当前层级更突出</b>
+          <p>选中目录后，直接子文件夹以紧凑卡片展示，减少深层目录跳转成本。</p>
+        </article>
+        <article class="note-card">
+          <b>缩略图仍是主体</b>
+          <p>左侧只负责导航，中间媒体网格保持最大视觉权重。</p>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const folders = [
+        { path: 'Assets', name: 'Assets', count: 128, depth: 0, parent: null },
+        { path: 'Assets/UI Screens', name: 'UI Screens', count: 46, depth: 1, parent: 'Assets' },
+        { path: 'Assets/Video Clips', name: 'Video Clips', count: 18, depth: 1, parent: 'Assets' },
+        { path: 'Assets/Video Clips/Promo', name: 'Promo', count: 8, depth: 2, parent: 'Assets/Video Clips' },
+        { path: 'Assets/Icons', name: 'Icons', count: 64, depth: 1, parent: 'Assets' },
+        { path: 'Screenshots', name: 'Screenshots', count: 312, depth: 0, parent: null },
+        { path: 'Downloads', name: 'Downloads', count: 27, depth: 0, parent: null },
+        { path: 'Downloads/References', name: 'References', count: 14, depth: 1, parent: 'Downloads' },
+      ];
+
+      const media = {
+        'Assets': ['brand_cover.jpg', 'folder_preview.webp', 'asset_index.png', 'library_motion.mp4', 'palette.png', 'poster_dark.jpg'],
+        'Assets/UI Screens': ['onboarding_empty_state.png', 'settings_menu_compact.png', 'gallery_grid_dark.webp', 'detail_panel_preview.mp4', 'toolbar_filters.png', 'search_state.png'],
+        'Assets/Video Clips': ['demo_preview_motion.mp4', 'gallery_scroll.mov', 'folder_switch.mp4', 'hover_state.webm', 'modal_preview.mp4', 'clip_cover.jpg'],
+        'Assets/Video Clips/Promo': ['launch_teaser.mp4', 'hero_motion.mov', 'social_cut.webm', 'poster_frame.jpg', 'end_card.png', 'caption_style.png'],
+        'Assets/Icons': ['icon_gallery_folder.svg', 'icon_settings.svg', 'icon_search.svg', 'icon_video.svg', 'icon_image.svg', 'icon_close.svg'],
+        'Screenshots': ['desktop_home.png', 'sidebar_state.png', 'large_folder.png', 'selected_card.png', 'empty_state.png', 'detail_exif.png'],
+        'Downloads': ['reference_board.jpg', 'sample_video.mp4', 'wallpaper.webp', 'camera_raw_preview.jpg', 'imported_asset.png', 'notes_capture.png'],
+        'Downloads/References': ['plex_sidebar.jpg', 'google_photos_grid.png', 'finder_column.png', 'media_browser.png', 'dark_gallery.png', 'compact_toolbar.png'],
+      };
+
+      const state = {
+        mode: 'tree',
+        activePath: 'Assets/UI Screens',
+      };
+
+      const folderList = document.getElementById('folderList');
+      const childrenList = document.getElementById('childrenList');
+      const currentLevel = document.getElementById('currentLevel');
+      const treeMode = document.getElementById('treeMode');
+      const flatMode = document.getElementById('flatMode');
+      const galleryGrid = document.getElementById('galleryGrid');
+
+      function getFolder(path) {
+        return folders.find((folder) => folder.path === path) || folders[0];
+      }
+
+      function getChildren(path) {
+        return folders.filter((folder) => folder.parent === path);
+      }
+
+      function hasChildren(path) {
+        return getChildren(path).length > 0;
+      }
+
+      function setMode(mode) {
+        state.mode = mode;
+        render();
+      }
+
+      function selectFolder(path) {
+        state.activePath = path;
+        render();
+      }
+
+      function renderFolderButton(folder, options = {}) {
+        const button = document.createElement('button');
+        button.className = 'folder-item';
+        button.type = 'button';
+        button.style.setProperty('--depth', options.flat ? 0 : Math.min(folder.depth, 3));
+        button.classList.toggle('active', folder.path === state.activePath);
+        button.classList.toggle('has-children', hasChildren(folder.path));
+        button.classList.toggle('expanded', state.mode === 'tree' && hasChildren(folder.path));
+        button.innerHTML = `<span class="folder-name">${folder.name}</span><span class="count">${folder.count}</span>`;
+        button.addEventListener('click', () => selectFolder(folder.path));
+        return button;
+      }
+
+      function renderSidebar() {
+        folderList.innerHTML = '';
+        const list = state.mode === 'flat' ? folders : folders;
+        list.forEach((folder) => {
+          if (state.mode === 'tree' || folder.count > 0) {
+            folderList.appendChild(renderFolderButton(folder, { flat: state.mode === 'flat' }));
+          }
+        });
+
+        treeMode.classList.toggle('active', state.mode === 'tree');
+        flatMode.classList.toggle('active', state.mode === 'flat');
+        document.getElementById('modeCopy').textContent = state.mode === 'tree' ? '当前：轻量树 + 当前层级' : '当前：全局文件夹平铺';
+        document.getElementById('listTitle').textContent = state.mode === 'tree' ? '目录结构' : '全局平铺';
+        document.getElementById('listMeta').textContent = state.mode === 'tree' ? '轻量' : `${folders.length} 项`;
+        document.getElementById('sideHint').textContent = state.mode === 'tree'
+          ? '树形负责保留结构感；下方“当前层级”负责降低深层目录查找成本。'
+          : '平铺模式保留，用于快速扫视所有包含媒体的文件夹。';
+        currentLevel.hidden = state.mode !== 'tree';
+      }
+
+      function renderChildren() {
+        const active = getFolder(state.activePath);
+        const children = getChildren(active.path);
+        childrenList.innerHTML = '';
+        document.getElementById('childMeta').textContent = `${children.length} 个子文件夹`;
+        document.getElementById('currentSummary').textContent = children.length
+          ? `${active.name} 的直接子文件夹会在这里高亮展示。`
+          : `${active.name} 暂无子文件夹，继续浏览当前媒体网格。`;
+
+        if (!children.length) {
+          const empty = document.createElement('div');
+          empty.className = 'flat-note';
+          empty.textContent = '当前层级没有更深的文件夹。';
+          childrenList.appendChild(empty);
+          return;
+        }
+
+        children.forEach((child) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'child-card';
+          button.innerHTML = `<strong>${child.name}</strong><span class="count">${child.count}</span>`;
+          button.addEventListener('click', () => selectFolder(child.path));
+          childrenList.appendChild(button);
+        });
+      }
+
+      function renderGallery() {
+        const active = getFolder(state.activePath);
+        const items = media[active.path] || media.Assets;
+        document.getElementById('pathText').textContent = active.path.replaceAll('/', ' / ');
+        document.getElementById('fileStat').textContent = `${active.count} 个文件`;
+        document.getElementById('galleryTitle').textContent = active.name;
+        document.getElementById('galleryDesc').textContent = active.parent ? '当前子目录内容，左侧仍保留返回上层的结构感。' : '顶层目录内容，当前层级模块显示可进入的子文件夹。';
+        document.getElementById('folderBadge').textContent = active.path.replaceAll('/', ' / ');
+        document.getElementById('detailPath').textContent = active.path.replaceAll('/', ' / ');
+
+        galleryGrid.innerHTML = '';
+        items.forEach((name, index) => {
+          const isVideo = /\.(mp4|mov|webm)$/i.test(name);
+          const ext = name.split('.').pop().toUpperCase();
+          const card = document.createElement('article');
+          card.className = `card ${index === 0 ? 'selected' : ''}`;
+          const tone = index % 4 === 1 ? 'warm' : index % 4 === 2 ? 'cold' : index % 4 === 3 ? 'tall' : '';
+          card.innerHTML = `
+            <div class="thumb ${tone}">
+              <span class="format">${ext}</span>
+              ${isVideo ? '<span class="play"></span>' : ''}
+            </div>
+            <div class="card-meta">
+              <div class="name">${name}</div>
+              <div class="meta-line"><span>${isVideo ? '00:24' : '1440 x 900'}</span><span>${isVideo ? '12 MB' : '428 KB'}</span></div>
+            </div>
+          `;
+          galleryGrid.appendChild(card);
+        });
+
+        const first = items[0];
+        const firstIsVideo = /\.(mp4|mov|webm)$/i.test(first);
+        document.getElementById('detailName').textContent = first;
+        document.getElementById('detailType').textContent = firstIsVideo ? `视频 ${first.split('.').pop().toUpperCase()}` : `图片 ${first.split('.').pop().toUpperCase()}`;
+        document.getElementById('detailSize').textContent = firstIsVideo ? '12 MB' : '428 KB';
+        document.getElementById('detailRes').textContent = firstIsVideo ? '1920 x 1080' : '1440 x 900';
+      }
+
+      function render() {
+        renderSidebar();
+        renderChildren();
+        renderGallery();
+      }
+
+      treeMode.addEventListener('click', () => setMode('tree'));
+      flatMode.addEventListener('click', () => setMode('flat'));
+      render();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Side And Detail Wireframe</title>
+    <style>
+      :root {
+        --bg: #f6f8fb;
+        --panel: #ffffff;
+        --panel-soft: #f1f4f8;
+        --line: #e5eaf1;
+        --text: #202734;
+        --muted: #667085;
+        --soft: #98a2b3;
+        --accent: #4f6df5;
+        --accent-soft: #eef2ff;
+        --radius: 18px;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 70% -10%, rgba(79, 109, 245, 0.11), transparent 32%),
+          var(--bg);
+      }
+
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .hero {
+        margin-bottom: 22px;
+      }
+
+      .kicker {
+        margin: 0 0 8px;
+        color: var(--accent);
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(30px, 4vw, 52px);
+        line-height: 0.98;
+        letter-spacing: -0.055em;
+      }
+
+      .subtitle {
+        max-width: 760px;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+
+      .panel {
+        overflow: hidden;
+        border-radius: 28px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        box-shadow: 0 24px 60px rgba(30, 41, 59, 0.09);
+      }
+
+      .panel-head {
+        min-height: 112px;
+        padding: 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-head h2 {
+        font-size: 22px;
+        letter-spacing: -0.035em;
+      }
+
+      .panel-head p {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .app {
+        height: 520px;
+        display: grid;
+        grid-template-columns: 210px minmax(0, 1fr) 250px;
+        background: #fbfcfe;
+      }
+
+      .side,
+      .detail {
+        padding: 14px;
+        background: #fff;
+      }
+
+      .side {
+        border-right: 1px solid var(--line);
+      }
+
+      .detail {
+        border-left: 1px solid var(--line);
+      }
+
+      .content {
+        min-width: 0;
+        padding: 16px;
+        background: #f8fafc;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 40px;
+        margin-bottom: 16px;
+      }
+
+      .bar-title {
+        width: 40%;
+        height: 14px;
+        border-radius: 999px;
+        background: #dce3ee;
+      }
+
+      .bar-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .dot {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        background: #edf1f7;
+      }
+
+      .media-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .media {
+        height: 78px;
+        border-radius: 16px;
+        background:
+          linear-gradient(135deg, rgba(79, 109, 245, 0.16), transparent 50%),
+          #e9eef7;
+      }
+
+      .media:nth-child(2) {
+        background:
+          linear-gradient(135deg, rgba(14, 165, 233, 0.15), transparent 50%),
+          #e9eef7;
+      }
+
+      .media:nth-child(3) {
+        background:
+          linear-gradient(135deg, rgba(245, 158, 11, 0.16), transparent 50%),
+          #e9eef7;
+      }
+
+      .label {
+        color: var(--soft);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .side-title,
+      .detail-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+
+      .switch {
+        display: flex;
+        gap: 5px;
+      }
+
+      .switch span {
+        width: 26px;
+        height: 24px;
+        border-radius: 8px;
+        background: var(--panel-soft);
+      }
+
+      .switch span:first-child {
+        background: var(--accent-soft);
+      }
+
+      .folder-list {
+        display: grid;
+        gap: 5px;
+      }
+
+      .folder {
+        display: grid;
+        grid-template-columns: 14px minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 8px;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .folder.active {
+        color: #1f2a44;
+        background: var(--accent-soft);
+      }
+
+      .folder.depth-1 {
+        margin-left: 12px;
+      }
+
+      .folder.depth-2 {
+        margin-left: 24px;
+      }
+
+      .chev {
+        width: 7px;
+        height: 7px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(-45deg);
+        opacity: 0.34;
+      }
+
+      .folder.active .chev {
+        opacity: 0.7;
+      }
+
+      .folder-name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .count {
+        color: var(--soft);
+        font-size: 10px;
+      }
+
+      .hint-box {
+        margin-bottom: 12px;
+        padding: 12px;
+        border-radius: 14px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.6;
+      }
+
+      .heavy .side,
+      .heavy .detail {
+        background: #f7f9fc;
+      }
+
+      .heavy .folder {
+        border: 1px solid #e3e9f2;
+        background: #fff;
+      }
+
+      .heavy .folder.active {
+        border-color: #b9c5ff;
+        background: #eef2ff;
+        box-shadow: inset 0 0 0 1px #dbe3ff;
+      }
+
+      .heavy .count {
+        min-width: 26px;
+        display: inline-flex;
+        justify-content: center;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: #eef2f7;
+      }
+
+      .light .side {
+        background: rgba(255, 255, 255, 0.92);
+      }
+
+      .light .folder {
+        background: transparent;
+      }
+
+      .light .folder:hover {
+        background: #f6f8fb;
+      }
+
+      .light .count {
+        opacity: 0.62;
+      }
+
+      .preview {
+        height: 136px;
+        border-radius: 18px;
+        background:
+          linear-gradient(135deg, rgba(79, 109, 245, 0.15), transparent 48%),
+          #e9eef7;
+      }
+
+      .file-name {
+        margin-top: 12px;
+        height: 16px;
+        width: 82%;
+        border-radius: 999px;
+        background: #dce3ee;
+      }
+
+      .file-path {
+        margin-top: 8px;
+        height: 11px;
+        width: 62%;
+        border-radius: 999px;
+        background: #edf1f7;
+      }
+
+      .info-card {
+        display: grid;
+        gap: 9px;
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 16px;
+        background: #f5f7fa;
+      }
+
+      .info-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .info-row strong {
+        color: var(--text);
+      }
+
+      .heavy .info-card,
+      .heavy .preview {
+        border: 1px solid #e2e8f0;
+        background-color: #fff;
+      }
+
+      .light .detail {
+        background: rgba(255, 255, 255, 0.92);
+      }
+
+      .light .preview {
+        border: 0;
+      }
+
+      .light .info-card {
+        border: 0;
+        background: #f6f8fb;
+      }
+
+      .annotations {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .note {
+        padding: 16px;
+        border-radius: 18px;
+        background: #fff;
+        border: 1px solid var(--line);
+      }
+
+      .note h3 {
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+
+      .note p {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .focus {
+        color: var(--accent);
+      }
+
+      @media (max-width: 1200px) {
+        .compare,
+        .annotations {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 840px) {
+        .page {
+          padding: 18px;
+        }
+
+        .app {
+          height: auto;
+          grid-template-columns: 1fr;
+        }
+
+        .side,
+        .detail {
+          border: 0;
+        }
+
+        .media-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="kicker">Gallery Viewer / Side & Detail Wireframe</p>
+        <h1>左侧目录与右侧详情线框图</h1>
+        <p class="subtitle">
+          这张图只看结构和信息层级，不看最终颜色。上方是“存在感偏重”的状态，
+          下方是推荐的 Google Photos 化轻量方案：目录还在，但更安静；详情还在，但预览优先。
+        </p>
+      </section>
+
+      <section class="compare">
+        <article class="panel heavy">
+          <div class="panel-head">
+            <h2>当前容易变重的结构</h2>
+            <p>说明文字、边框、数量 badge、信息分组都同时出现，容易让页面像后台管理工具。</p>
+          </div>
+          <div class="app">
+            <aside class="side">
+              <div class="side-title">
+                <div>
+                  <div class="label">资源导航</div>
+                  <h3>文件夹</h3>
+                </div>
+                <div class="switch"><span></span><span></span></div>
+              </div>
+              <div class="hint-box">
+                支持点击目录快速切换浏览范围，适合查看层级较深的大型项目素材目录。
+              </div>
+              <div class="folder-list">
+                <div class="folder active"><span class="chev"></span><span class="folder-name">Assets</span><span class="count">128</span></div>
+                <div class="folder depth-1"><span class="chev"></span><span class="folder-name">UI Screens</span><span class="count">46</span></div>
+                <div class="folder depth-1"><span class="chev"></span><span class="folder-name">Video Clips</span><span class="count">18</span></div>
+                <div class="folder depth-2"><span class="chev"></span><span class="folder-name">Promo</span><span class="count">8</span></div>
+                <div class="folder depth-1"><span class="chev"></span><span class="folder-name">Icons</span><span class="count">64</span></div>
+              </div>
+            </aside>
+            <section class="content">
+              <div class="topbar">
+                <div class="bar-title"></div>
+                <div class="bar-actions"><span class="dot"></span><span class="dot"></span></div>
+              </div>
+              <div class="media-grid">
+                <div class="media"></div>
+                <div class="media"></div>
+                <div class="media"></div>
+                <div class="media"></div>
+                <div class="media"></div>
+                <div class="media"></div>
+              </div>
+            </section>
+            <aside class="detail">
+              <div class="detail-title">
+                <h3>文件信息</h3>
+                <span class="dot"></span>
+              </div>
+              <div class="preview"></div>
+              <div class="file-name"></div>
+              <div class="file-path"></div>
+              <div class="info-card">
+                <div class="info-row"><span>格式</span><strong>图片 PNG</strong></div>
+                <div class="info-row"><span>大小</span><strong>428 KB</strong></div>
+                <div class="info-row"><span>修改时间</span><strong>今天 18:42</strong></div>
+                <div class="info-row"><span>分辨率</span><strong>1440 x 900</strong></div>
+              </div>
+              <div class="info-card">
+                <div class="info-row"><span>EXIF</span><strong>更多字段</strong></div>
+                <div class="info-row"><span>设备</span><strong>Camera</strong></div>
+              </div>
+            </aside>
+          </div>
+        </article>
+
+        <article class="panel light">
+          <div class="panel-head">
+            <h2>推荐轻量结构</h2>
+            <p>删除常驻说明块，弱化数量和边框。详情以预览为主，信息只保留高频字段。</p>
+          </div>
+          <div class="app">
+            <aside class="side">
+              <div class="side-title">
+                <div>
+                  <div class="label">Library</div>
+                  <h3>文件夹</h3>
+                </div>
+                <div class="switch"><span></span><span></span></div>
+              </div>
+              <div class="folder-list">
+                <div class="folder active"><span class="chev"></span><span class="folder-name">Assets</span><span class="count">128</span></div>
+                <div class="folder depth-1"><span class="chev"></span><span class="folder-name">UI Screens</span><span class="count">46</span></div>
+                <div class="folder depth-1"><span class="chev"></span><span class="folder-name">Video Clips</span><span class="count">18</span></div>
+                <div class="folder depth-2"><span class="chev"></span><span class="folder-name">Promo</span><span class="count">8</span></div>
+                <div class="folder depth-1"><span class="chev"></span><span class="folder-name">Icons</span><span class="count">64</span></div>
+                <div class="folder"><span class="chev"></span><span class="folder-name">Screenshots</span><span class="count">312</span></div>
+              </div>
+            </aside>
+            <section class="content">
+              <div class="topbar">
+                <div class="bar-title"></div>
+                <div class="bar-actions"><span class="dot"></span><span class="dot"></span></div>
+              </div>
+              <div class="media-grid">
+                <div class="media"></div>
+                <div class="media"></div>
+                <div class="media"></div>
+                <div class="media"></div>
+                <div class="media"></div>
+                <div class="media"></div>
+              </div>
+            </section>
+            <aside class="detail">
+              <div class="detail-title">
+                <h3>详情</h3>
+                <span class="dot"></span>
+              </div>
+              <div class="preview"></div>
+              <div class="file-name"></div>
+              <div class="file-path"></div>
+              <div class="info-card">
+                <div class="info-row"><span>格式</span><strong>PNG</strong></div>
+                <div class="info-row"><span>大小</span><strong>428 KB</strong></div>
+                <div class="info-row"><span>分辨率</span><strong>1440 x 900</strong></div>
+                <div class="info-row"><span>修改时间</span><strong>今天 18:42</strong></div>
+              </div>
+            </aside>
+          </div>
+        </article>
+      </section>
+
+      <section class="annotations">
+        <div class="note">
+          <h3>左侧目录怎么变轻？</h3>
+          <p>
+            去掉常驻说明块，目录项不再每行都有强边框。
+            数量 <span class="focus">保留但弱化</span>，当前目录只用柔和底色提示。
+          </p>
+        </div>
+        <div class="note">
+          <h3>右侧详情怎么变轻？</h3>
+          <p>
+            详情面板仍可开关，但内容以预览图为第一视觉。
+            基础信息放在一个紧凑区域，EXIF 不再默认抢占空间。
+          </p>
+        </div>
+        <div class="note">
+          <h3>为什么不删掉两侧？</h3>
+          <p>
+            这是本地相册，不是纯云相册。目录和详情是本地素材浏览的效率来源，
+            所以策略是 <span class="focus">弱化存在感，而不是删除能力</span>。
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

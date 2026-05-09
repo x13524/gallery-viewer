@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gallery Viewer Style Comparison</title>
+    <style>
+      :root {
+        --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+        --page: #080a10;
+        --text: #f5f7fb;
+        --muted: #a8b0be;
+        --soft: #6d7685;
+        --line: rgba(255, 255, 255, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font);
+        color: var(--text);
+        background:
+          radial-gradient(circle at 50% -10%, rgba(125, 141, 255, 0.16), transparent 32%),
+          var(--page);
+      }
+
+      .page {
+        max-width: 1520px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .hero {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 22px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .kicker {
+        margin-bottom: 8px;
+        color: #9aa7ff;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        font-size: clamp(30px, 4vw, 52px);
+        line-height: 0.98;
+        letter-spacing: -0.055em;
+      }
+
+      .subtitle {
+        max-width: 780px;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .hint {
+        max-width: 360px;
+        color: var(--soft);
+        font-size: 12px;
+        line-height: 1.6;
+        text-align: right;
+      }
+
+      .comparison {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .option {
+        overflow: hidden;
+        min-height: 760px;
+        border-radius: 28px;
+        border: 1px solid var(--line);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+      }
+
+      .option-head {
+        min-height: 136px;
+        padding: 22px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .option-head h2 {
+        font-size: 24px;
+        letter-spacing: -0.035em;
+      }
+
+      .option-head p {
+        margin-top: 8px;
+        color: currentColor;
+        opacity: 0.68;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 14px;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 0 9px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+        font-size: 11px;
+      }
+
+      .mock {
+        height: 624px;
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+
+      .toolbar {
+        padding: 13px;
+      }
+
+      .toolbar-main {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 9px;
+        align-items: center;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .search {
+        min-width: 0;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        border-radius: 999px;
+        font-size: 12px;
+      }
+
+      .icon-row {
+        display: flex;
+        gap: 7px;
+      }
+
+      .icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+      }
+
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 9px;
+      }
+
+      .chip {
+        min-height: 24px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 9px;
+        border-radius: 999px;
+        font-size: 11px;
+      }
+
+      .body {
+        min-height: 0;
+        display: grid;
+      }
+
+      .side {
+        min-width: 0;
+        padding: 12px;
+      }
+
+      .folder {
+        min-height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 0 9px;
+        border-radius: 10px;
+        font-size: 11px;
+      }
+
+      .folder + .folder {
+        margin-top: 5px;
+      }
+
+      .grid {
+        min-width: 0;
+        padding: 14px;
+        display: grid;
+        align-content: start;
+        gap: 12px;
+      }
+
+      .card {
+        min-width: 0;
+      }
+
+      .thumb {
+        position: relative;
+        overflow: hidden;
+        border-radius: 16px;
+      }
+
+      .thumb::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 72% 20%, rgba(255, 255, 255, 0.22), transparent 24%),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 45%);
+      }
+
+      .thumb.video::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 42px;
+        height: 42px;
+        border-radius: 999px;
+        transform: translate(-50%, -50%);
+      }
+
+      .meta {
+        margin-top: 7px;
+      }
+
+      .name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .sub {
+        margin-top: 4px;
+        display: flex;
+        justify-content: space-between;
+        color: currentColor;
+        opacity: 0.48;
+        font-size: 10px;
+      }
+
+      .detail {
+        padding: 12px;
+      }
+
+      .preview {
+        border-radius: 18px;
+      }
+
+      .info {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
+        font-size: 11px;
+      }
+
+      .info div {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .notes {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .note {
+        padding: 18px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.045);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .note h3 {
+        margin-bottom: 8px;
+      }
+
+      .note p {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      /* Google Photos style */
+      .photos {
+        color: #1f2937;
+        background: #f8fafc;
+      }
+
+      .photos .option-head {
+        background: #ffffff;
+      }
+
+      .photos .mock {
+        background: #f6f8fb;
+      }
+
+      .photos .toolbar {
+        background: rgba(255, 255, 255, 0.92);
+        border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+      }
+
+      .photos .btn {
+        color: #fff;
+        background: #2563eb;
+      }
+
+      .photos .search,
+      .photos .icon,
+      .photos .chip,
+      .photos .tag {
+        background: #eef2f7;
+        color: #475569;
+      }
+
+      .photos .body {
+        grid-template-columns: 1fr;
+      }
+
+      .photos .side,
+      .photos .detail {
+        display: none;
+      }
+
+      .photos .grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        padding: 16px;
+      }
+
+      .photos .thumb {
+        height: 118px;
+        background: linear-gradient(135deg, #dbeafe, #f1f5f9);
+      }
+
+      .photos .card:nth-child(2) .thumb {
+        background: linear-gradient(135deg, #fee2e2, #f8fafc);
+      }
+
+      .photos .card:nth-child(3) .thumb {
+        background: linear-gradient(135deg, #dcfce7, #f8fafc);
+      }
+
+      .photos .card:nth-child(4) .thumb {
+        background: linear-gradient(135deg, #fef3c7, #f8fafc);
+      }
+
+      .photos .meta {
+        color: #334155;
+      }
+
+      /* Plex style */
+      .plex {
+        color: #f6f7fb;
+        background: #08090d;
+      }
+
+      .plex .option-head {
+        background:
+          radial-gradient(circle at 80% -20%, rgba(245, 158, 11, 0.18), transparent 42%),
+          #0b0d12;
+      }
+
+      .plex .mock {
+        background:
+          radial-gradient(circle at 60% 0%, rgba(245, 158, 11, 0.12), transparent 32%),
+          #06070a;
+      }
+
+      .plex .toolbar {
+        background: rgba(8, 9, 13, 0.88);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+      }
+
+      .plex .btn {
+        color: #111;
+        background: #f5b942;
+      }
+
+      .plex .search,
+      .plex .icon,
+      .plex .chip,
+      .plex .tag {
+        background: rgba(255, 255, 255, 0.075);
+        color: rgba(246, 247, 251, 0.78);
+      }
+
+      .plex .body {
+        grid-template-columns: 1fr 220px;
+      }
+
+      .plex .side {
+        display: none;
+      }
+
+      .plex .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        padding: 18px;
+      }
+
+      .plex .thumb {
+        height: 174px;
+        background: linear-gradient(140deg, #2a1d12, #121318 70%);
+      }
+
+      .plex .card:nth-child(2) .thumb {
+        background: linear-gradient(140deg, #172032, #0d0f14 70%);
+      }
+
+      .plex .card:nth-child(3) .thumb {
+        background: linear-gradient(140deg, #2f1d2a, #0d0f14 70%);
+      }
+
+      .plex .card:nth-child(4) .thumb {
+        background: linear-gradient(140deg, #1d2f2a, #0d0f14 70%);
+      }
+
+      .plex .thumb.video::after {
+        background: rgba(0, 0, 0, 0.56);
+      }
+
+      .plex .detail {
+        border-left: 1px solid rgba(255, 255, 255, 0.055);
+        background: rgba(10, 12, 17, 0.82);
+      }
+
+      .plex .preview {
+        height: 170px;
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), transparent 45%), #15171d;
+      }
+
+      .plex .info {
+        color: rgba(246, 247, 251, 0.72);
+      }
+
+      /* KMPlayer style */
+      .km {
+        color: #eef2f7;
+        background: #0d121a;
+      }
+
+      .km .option-head {
+        background:
+          linear-gradient(135deg, rgba(56, 189, 248, 0.12), transparent),
+          #101722;
+      }
+
+      .km .mock {
+        background: #0b111a;
+      }
+
+      .km .toolbar {
+        background: #111925;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+      }
+
+      .km .btn {
+        color: #07111f;
+        background: #7dd3fc;
+      }
+
+      .km .search,
+      .km .icon,
+      .km .chip,
+      .km .tag {
+        background: rgba(148, 163, 184, 0.11);
+        color: rgba(238, 242, 247, 0.82);
+      }
+
+      .km .body {
+        grid-template-columns: 150px minmax(0, 1fr) 190px;
+      }
+
+      .km .side {
+        border-right: 1px solid rgba(148, 163, 184, 0.12);
+        background: rgba(7, 12, 20, 0.85);
+      }
+
+      .km .folder {
+        background: transparent;
+        color: rgba(238, 242, 247, 0.68);
+      }
+
+      .km .folder.active {
+        background: rgba(56, 189, 248, 0.14);
+        color: #fff;
+      }
+
+      .km .grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px;
+      }
+
+      .km .card {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        padding: 7px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .km .card:nth-child(1) {
+        outline: 1px solid rgba(56, 189, 248, 0.38);
+        background: rgba(56, 189, 248, 0.1);
+      }
+
+      .km .thumb {
+        height: 58px;
+        border-radius: 11px;
+        background: linear-gradient(135deg, #183044, #111827);
+      }
+
+      .km .card:nth-child(2) .thumb {
+        background: linear-gradient(135deg, #33233b, #111827);
+      }
+
+      .km .card:nth-child(3) .thumb {
+        background: linear-gradient(135deg, #34301d, #111827);
+      }
+
+      .km .card:nth-child(4) .thumb {
+        background: linear-gradient(135deg, #1d342b, #111827);
+      }
+
+      .km .meta {
+        margin-top: 0;
+      }
+
+      .km .detail {
+        border-left: 1px solid rgba(148, 163, 184, 0.12);
+        background: rgba(7, 12, 20, 0.85);
+      }
+
+      .km .preview {
+        height: 130px;
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), transparent), #111827;
+      }
+
+      @media (max-width: 1180px) {
+        .comparison,
+        .notes {
+          grid-template-columns: 1fr;
+        }
+
+        .option {
+          min-height: auto;
+        }
+
+        .hero {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .hint {
+          text-align: left;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          padding: 18px;
+        }
+
+        .km .body,
+        .plex .body {
+          grid-template-columns: 1fr;
+        }
+
+        .km .side,
+        .km .detail,
+        .plex .detail {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <p class="kicker">Gallery Viewer / Style Direction Preview</p>
+          <h1>三种媒体产品气质快速预览</h1>
+          <p class="subtitle">
+            这不是最终 UI，只是帮助判断风格方向。你可以直接看哪一栏最顺眼：
+            是更轻的相册、更沉浸的媒体库，还是更高效的素材工具。
+          </p>
+        </div>
+        <p class="hint">
+          建议先不要看文字解释，先凭第一眼选择：哪一栏最像你想要的本地相册？
+        </p>
+      </section>
+
+      <section class="comparison">
+        <article class="option photos">
+          <div class="option-head">
+            <h2>A. Google Photos 感</h2>
+            <p>轻、干净、低边框、控件弱化。适合照片浏览和截图管理，信息密度最低。</p>
+            <div class="tags">
+              <span class="tag">更轻</span>
+              <span class="tag">更干净</span>
+              <span class="tag">照片优先</span>
+            </div>
+          </div>
+          <div class="mock">
+            <div class="toolbar">
+              <div class="toolbar-main">
+                <div class="btn">打开文件夹</div>
+                <div class="search">搜索照片、视频、后缀</div>
+                <div class="icon-row">
+                  <span class="icon"></span>
+                  <span class="icon"></span>
+                </div>
+              </div>
+              <div class="filters">
+                <span class="chip">全部</span>
+                <span class="chip">图片</span>
+                <span class="chip">视频</span>
+                <span class="chip">名称 ↑</span>
+              </div>
+            </div>
+            <div class="body">
+              <div class="grid">
+                <div class="card">
+                  <div class="thumb"></div>
+                  <div class="meta">
+                    <div class="name">holiday_photo_001.jpg</div>
+                    <div class="sub"><span>1920 x 1080</span><span>1.4 MB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb"></div>
+                  <div class="meta">
+                    <div class="name">screenshot_home.png</div>
+                    <div class="sub"><span>1440 x 900</span><span>420 KB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb video"></div>
+                  <div class="meta">
+                    <div class="name">clip_preview.mp4</div>
+                    <div class="sub"><span>00:18</span><span>8 MB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb"></div>
+                  <div class="meta">
+                    <div class="name">icon_empty_state.svg</div>
+                    <div class="sub"><span>128 x 128</span><span>5 KB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb"></div>
+                  <div class="meta">
+                    <div class="name">gallery_detail.webp</div>
+                    <div class="sub"><span>800 x 600</span><span>210 KB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb"></div>
+                  <div class="meta">
+                    <div class="name">cover_image.jpg</div>
+                    <div class="sub"><span>2048 x 1365</span><span>2.1 MB</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="option plex">
+          <div class="option-head">
+            <h2>B. Plex 感</h2>
+            <p>深色、沉浸、缩略图更大、更像媒体库。适合视频和大图浏览，视觉冲击最强。</p>
+            <div class="tags">
+              <span class="tag">更沉浸</span>
+              <span class="tag">缩略图更大</span>
+              <span class="tag">视频友好</span>
+            </div>
+          </div>
+          <div class="mock">
+            <div class="toolbar">
+              <div class="toolbar-main">
+                <div class="btn">打开文件夹</div>
+                <div class="search">搜索媒体库</div>
+                <div class="icon-row">
+                  <span class="icon"></span>
+                  <span class="icon"></span>
+                </div>
+              </div>
+              <div class="filters">
+                <span class="chip">128 个文件</span>
+                <span class="chip">全部</span>
+                <span class="chip">视频</span>
+                <span class="chip">中图</span>
+              </div>
+            </div>
+            <div class="body">
+              <div class="grid">
+                <div class="card">
+                  <div class="thumb video"></div>
+                  <div class="meta">
+                    <div class="name">cinematic_preview.mp4</div>
+                    <div class="sub"><span>00:42</span><span>32 MB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb"></div>
+                  <div class="meta">
+                    <div class="name">poster_dark_media.jpg</div>
+                    <div class="sub"><span>1920 x 1080</span><span>2.8 MB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb video"></div>
+                  <div class="meta">
+                    <div class="name">motion_showcase.mp4</div>
+                    <div class="sub"><span>01:08</span><span>58 MB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb"></div>
+                  <div class="meta">
+                    <div class="name">gallery_cover.webp</div>
+                    <div class="sub"><span>1600 x 900</span><span>1.2 MB</span></div>
+                  </div>
+                </div>
+              </div>
+              <aside class="detail">
+                <div class="preview"></div>
+                <div class="info">
+                  <div><span>当前选中</span><strong>视频 MP4</strong></div>
+                  <div><span>时长</span><strong>00:42</strong></div>
+                  <div><span>大小</span><strong>32 MB</strong></div>
+                  <div><span>分辨率</span><strong>1920 x 1080</strong></div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </article>
+
+        <article class="option km">
+          <div class="option-head">
+            <h2>C. KMPlayer 感</h2>
+            <p>工具效率更高，目录、列表、详情同时可见。适合项目素材筛选和快速定位。</p>
+            <div class="tags">
+              <span class="tag">更高效</span>
+              <span class="tag">信息更多</span>
+              <span class="tag">素材工具</span>
+            </div>
+          </div>
+          <div class="mock">
+            <div class="toolbar">
+              <div class="toolbar-main">
+                <div class="btn">打开文件夹</div>
+                <div class="search">搜索文件名 / 后缀</div>
+                <div class="icon-row">
+                  <span class="icon"></span>
+                  <span class="icon"></span>
+                </div>
+              </div>
+              <div class="filters">
+                <span class="chip">全部</span>
+                <span class="chip">包含子目录</span>
+                <span class="chip">大小 ↓</span>
+              </div>
+            </div>
+            <div class="body">
+              <aside class="side">
+                <div class="folder active"><span>Assets</span><span>128</span></div>
+                <div class="folder"><span>Videos</span><span>18</span></div>
+                <div class="folder"><span>Icons</span><span>64</span></div>
+                <div class="folder"><span>Shots</span><span>312</span></div>
+              </aside>
+              <div class="grid">
+                <div class="card">
+                  <div class="thumb video"></div>
+                  <div class="meta">
+                    <div class="name">demo_preview_motion.mp4</div>
+                    <div class="sub"><span>00:24</span><span>12 MB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb"></div>
+                  <div class="meta">
+                    <div class="name">settings_panel.png</div>
+                    <div class="sub"><span>1200 x 760</span><span>530 KB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb"></div>
+                  <div class="meta">
+                    <div class="name">icon_gallery.svg</div>
+                    <div class="sub"><span>128 x 128</span><span>6 KB</span></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="thumb"></div>
+                  <div class="meta">
+                    <div class="name">cover_dark.jpg</div>
+                    <div class="sub"><span>1920 x 1080</span><span>1.8 MB</span></div>
+                  </div>
+                </div>
+              </div>
+              <aside class="detail">
+                <div class="preview"></div>
+                <div class="info">
+                  <div><span>格式</span><strong>视频 MP4</strong></div>
+                  <div><span>大小</span><strong>12 MB</strong></div>
+                  <div><span>时长</span><strong>00:24</strong></div>
+                  <div><span>路径</span><strong>Assets</strong></div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="notes">
+        <div class="note">
+          <h3>A 适合什么情况？</h3>
+          <p>你主要浏览照片、截图、轻量素材，希望界面尽可能安静，顶部和详情都弱化。</p>
+        </div>
+        <div class="note">
+          <h3>B 适合什么情况？</h3>
+          <p>你更重视沉浸感和媒体封面，希望一打开就像视频/图片媒体库，缩略图更有存在感。</p>
+        </div>
+        <div class="note">
+          <h3>C 适合什么情况？</h3>
+          <p>你经常在项目资源目录里快速筛素材，希望目录、列表、详情同时高效可见。</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

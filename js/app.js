@@ -81,7 +81,7 @@ const state = {
   thumbSize: THUMB_PRESETS.medium,
   searchQuery: '',
   typeFilter: 'all',
-  autoRestoreLastFolder: false,
+  autoRestoreLastFolder: true,
   includeSubfolders: false,
   excludeCommonDirs: true,
 
@@ -1548,10 +1548,12 @@ function createGalleryCard(file, index) {
   card.title = file.path;
 
   const type = isVideo(file.name) ? 'video' : 'image';
+  const typeLabel = type === 'video' ? '视频' : '图片';
+  card.setAttribute('aria-label', `${file.name}，${typeLabel}`);
   card.innerHTML = `
     <div class="thumb-img-wrap">
-      <span class="format-badge">${escapeHTML(file.ext.toUpperCase() || 'FILE')}</span>
-      ${type === 'video' ? '<span class="video-badge">视频</span><span class="video-overlay"><span class="video-play" aria-hidden="true"></span></span>' : ''}
+      <span class="format-badge" aria-hidden="true">${escapeHTML(file.ext.toUpperCase() || 'FILE')}</span>
+      ${type === 'video' ? '<span class="video-overlay"><span class="video-play" aria-hidden="true"></span></span>' : ''}
     </div>
     <div class="thumb-body">
       <div class="thumb-name" title="${escapeHTML(file.name)}">${escapeHTML(file.name)}</div>
@@ -1661,6 +1663,8 @@ async function loadThumbForCard(card) {
 
   const thumbPromise = generateThumb(file, isVideo(file.name));
   const metaPromise = ensureCardVisualMeta(file);
+  let imageReadyPromise = Promise.resolve();
+  let thumbImg = null;
 
   const thumbURL = await thumbPromise;
   if (card.dataset.index !== String(index) || !card.isConnected) {
@@ -1670,18 +1674,27 @@ async function loadThumbForCard(card) {
 
   if (thumbURL) {
     const img = document.createElement('img');
+    thumbImg = img;
     img.className = 'thumb-img';
     img.loading = 'lazy';
-    img.src = thumbURL;
     img.alt = file.name;
     img.draggable = false;
-    img.addEventListener('load', () => {
-      img.classList.add('is-ready');
-      URL.revokeObjectURL(thumbURL);
-    }, { once: true });
-    img.addEventListener('error', () => {
-      URL.revokeObjectURL(thumbURL);
-    }, { once: true });
+    imageReadyPromise = new Promise((resolve) => {
+      let resolved = false;
+      const finishImageLoad = () => {
+        if (resolved) return;
+        resolved = true;
+        URL.revokeObjectURL(thumbURL);
+        resolve();
+      };
+      img.addEventListener('load', () => {
+        finishImageLoad();
+      }, { once: true });
+      img.addEventListener('error', () => {
+        finishImageLoad();
+      }, { once: true });
+    });
+    img.src = thumbURL;
     wrap.appendChild(img);
   }
 
@@ -1689,6 +1702,14 @@ async function loadThumbForCard(card) {
 
   await metaPromise;
   if (card.dataset.index !== String(index) || !card.isConnected) return;
+
+  const isSmallMedia = file.width && file.height
+    && file.width <= wrap.clientWidth
+    && file.height <= wrap.clientHeight;
+  wrap.classList.toggle('is-small-media', Boolean(isSmallMedia));
+  await imageReadyPromise;
+  if (card.dataset.index !== String(index) || !card.isConnected) return;
+  if (thumbImg) thumbImg.classList.add('is-ready');
 
   if (dimensionLabel) {
     if (isVideo(file.name)) {

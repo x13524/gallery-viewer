@@ -869,8 +869,10 @@ input[type="range"] {
 
 .settings-panel {
   width: 100%;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 12px;
   border-radius: 14px;
@@ -2010,13 +2012,19 @@ input[type="text"],
 .settings-panel .settings-menu-group {
   gap: 7px;
   min-width: 0;
-  align-items: flex-start;
+  width: fit-content;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .settings-panel .toggle-field,
 .settings-panel .settings-menu-toggle {
   width: auto;
+  display: inline-grid;
+  grid-template-columns: 13px minmax(0, max-content);
   align-self: flex-start;
+  align-items: center;
   min-height: 28px;
   padding: 0 9px;
   gap: 7px;
@@ -2024,13 +2032,21 @@ input[type="text"],
   background: rgba(255, 255, 255, 0.04);
   color: rgba(244, 247, 251, 0.76);
   font-size: 11px;
-  line-height: 1;
+  line-height: 1.35;
 }
 
 .settings-panel .toggle-field input {
   width: 13px;
   height: 13px;
   flex: 0 0 auto;
+  margin: 0;
+}
+
+.settings-panel .toggle-field span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-menu-actions {
@@ -2218,6 +2234,180 @@ input[type="text"],
 .thumb-card:hover .video-play {
   opacity: 1;
   transform: scale(1);
+}
+
+/* Google Photos wall: separate media, metadata, and selection boundaries. */
+#gallery {
+  gap: max(10px, var(--thumb-gap));
+}
+
+.thumb-card {
+  width: 100%;
+  overflow: visible;
+  padding: 4px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  transition:
+    transform 0.18s var(--easing),
+    box-shadow 0.18s var(--easing),
+    background 0.18s var(--easing);
+}
+
+.thumb-card:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.thumb-card.selected {
+  transform: none;
+  background: rgba(123, 140, 255, 0.08);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.thumb-card.selected::before {
+  display: none;
+}
+
+.thumb-card.is-open::after {
+  display: none;
+}
+
+.thumb-img-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  background: #11151d;
+  box-shadow: none;
+}
+
+.thumb-card:hover .thumb-img-wrap,
+.thumb-card.selected .thumb-img-wrap {
+  box-shadow: none;
+}
+
+.thumb-card.selected .thumb-img-wrap {
+  box-shadow: 0 0 0 3px var(--accent), 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.thumb-img-wrap img {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform: none;
+  transition: opacity 0.18s ease;
+}
+
+.thumb-img-wrap.is-small-media img {
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.thumb-card:hover .thumb-img-wrap img,
+.thumb-card:hover .thumb-img-wrap.is-small-media img {
+  transform: none;
+}
+
+.thumb-body {
+  position: static;
+  z-index: auto;
+  gap: 4px;
+  min-height: 36px;
+  padding: 8px 2px 0;
+  border: 0;
+  background: transparent;
+  opacity: 1;
+  transform: none;
+  transition: color 0.16s var(--easing);
+}
+
+.thumb-card:hover .thumb-body,
+.thumb-card.selected .thumb-body,
+.thumb-card:focus-visible .thumb-body {
+  opacity: 1;
+  transform: none;
+}
+
+.thumb-card.selected .thumb-body {
+  background: transparent;
+}
+
+.thumb-name {
+  color: rgba(244, 247, 251, 0.92);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.28;
+  text-shadow: none;
+}
+
+.thumb-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(165, 173, 186, 0.62);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.thumb-dimension,
+.thumb-size {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thumb-size {
+  flex: 0 0 auto;
+}
+
+.thumb-submeta {
+  display: none;
+}
+
+.format-badge {
+  top: 8px;
+  right: 8px;
+  min-height: 20px;
+  padding: 0 7px;
+  border: 0;
+  background: rgba(0, 0, 0, 0.56);
+  color: rgba(255, 255, 255, 0.86);
+  opacity: 0;
+  transition: opacity 0.16s var(--easing);
+}
+
+.thumb-card:hover .format-badge,
+.thumb-card.selected .format-badge,
+.thumb-card:focus-visible .format-badge {
+  opacity: 1;
+}
+
+.thumb-card.is-video .thumb-img-wrap::after {
+  background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, 0.4) 100%);
+}
+
+.video-play {
+  width: 44px;
+  height: 44px;
+  background: rgba(0, 0, 0, 0.38);
+  opacity: 0.88;
+}
+
+.video-play::before {
+  border-top-width: 8px;
+  border-bottom-width: 8px;
+  border-left-width: 13px;
 }
 
 #emptyState,
