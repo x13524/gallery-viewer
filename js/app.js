@@ -946,6 +946,10 @@ function flattenTree(node, list = []) {
   return list;
 }
 
+function getNodeChildren(node) {
+  return Array.isArray(node?.children) ? node.children.filter((child) => child.hasMedia) : [];
+}
+
 async function collectMediaFiles(node, includeSubfolders, scanId = state.activeScanId, options = {}) {
   ensureScanActive(scanId);
   const { onChunk = null, chunkSize = COLLECT_CHUNK_SIZE } = options;
@@ -1322,10 +1326,66 @@ function buildFolderItem(node, relativeText) {
   return item;
 }
 
+function buildCurrentLevelItem(node) {
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.className = 'current-level-item';
+  item.dataset.path = node.path;
+  item.title = node.path;
+  item.innerHTML = `
+    <span class="current-level-name">${escapeHTML(node.name)}</span>
+    <span class="folder-count">${node.totalMediaCount}</span>
+  `;
+  item.addEventListener('click', async () => {
+    await navigateToFolder(node);
+  });
+  return item;
+}
+
+function renderCurrentLevelPanel() {
+  const panel = document.getElementById('currentLevelPanel');
+  const list = document.getElementById('currentLevelList');
+  const count = document.getElementById('currentLevelCount');
+  const summary = document.getElementById('currentLevelSummary');
+  if (!panel || !list || !count || !summary) return;
+
+  list.innerHTML = '';
+
+  if (!state.folderTree || state.sidebarMode !== 'tree') {
+    panel.hidden = true;
+    return;
+  }
+
+  const activeNode = findNodeByPath(state.folderTree, state.activeFolderPath) || state.folderTree;
+  const children = getNodeChildren(activeNode);
+  panel.hidden = false;
+  count.textContent = `${children.length} 个子文件夹`;
+  summary.textContent = children.length
+    ? `${activeNode.name} 的直接子文件夹，可快速进入当前层级。`
+    : `${activeNode.name} 暂无子文件夹，继续浏览当前媒体内容。`;
+
+  if (!children.length) {
+    const empty = document.createElement('div');
+    empty.className = 'current-level-empty';
+    empty.textContent = '当前层级没有更深的媒体文件夹。';
+    list.appendChild(empty);
+    return;
+  }
+
+  children.forEach((child) => {
+    const item = buildCurrentLevelItem(child);
+    item.classList.toggle('active', item.dataset.path === state.activeFolderPath);
+    list.appendChild(item);
+  });
+}
+
 function renderSidebar() {
   const container = document.getElementById('folderList');
   container.innerHTML = '';
-  if (!state.folderTree) return;
+  if (!state.folderTree) {
+    renderCurrentLevelPanel();
+    return;
+  }
 
   if (state.sidebarMode === 'flat') renderFlatSidebar(container);
   else renderTreeSidebar(container);
@@ -1333,6 +1393,8 @@ function renderSidebar() {
   container.querySelectorAll('.folder-item').forEach((item) => {
     item.classList.toggle('active', item.dataset.path === state.activeFolderPath);
   });
+
+  renderCurrentLevelPanel();
 }
 
 function renderTreeSidebar(container) {
