@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>相册浏览器</title>
+    <link rel="stylesheet" href="js/vendor/xgplayer/dist/index.min.css" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside id="sidebar">
+        <div class="sidebar-header">
+          <div>
+            <p class="eyebrow">资源导航</p>
+            <h1 class="sidebar-title">文件夹</h1>
+          </div>
+          <div class="view-toggle" role="group" aria-label="目录视图">
+            <button
+              id="treeViewBtn"
+              class="btn-icon active"
+              type="button"
+              title="树形视图"
+              aria-label="树形视图"
+            >
+              <span class="icon-tree" aria-hidden="true"></span>
+            </button>
+            <button
+              id="flatViewBtn"
+              class="btn-icon"
+              type="button"
+              title="平铺视图"
+              aria-label="平铺视图"
+            >
+              <span class="icon-grid" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-hint">
+          支持点击目录快速切换浏览范围，适合查看层级较深的大型项目素材目录。
+        </div>
+        <div id="folderList"></div>
+      </aside>
+
+      <main id="main">
+        <header class="topbar">
+          <div class="toolbar-main">
+            <button id="openBtn" class="btn-primary" type="button">
+              打开文件夹
+            </button>
+            <div class="path-meta">
+              <div id="pathDisplay" class="breadcrumb">未选择文件夹</div>
+              <div class="toolbar-stats">
+                <span class="stat-pill" id="fileCount">0 个文件</span>
+                <span class="stat-pill" id="selectionStatus">未选中</span>
+                <span class="stat-pill" id="cacheStatus" title="缩略图缓存占用"
+                  >缓存 0 MB / 256 MB</span
+                >
+              </div>
+            </div>
+            <label class="search-field" for="searchInput">
+              <span class="search-icon" aria-hidden="true"></span>
+              <input
+                type="text"
+                id="searchInput"
+                placeholder="搜索文件名、后缀"
+              />
+            </label>
+          </div>
+
+          <div id="settingsRow" class="toolbar-settings">
+            <div class="settings-group">
+              <span class="group-label">视图</span>
+              <label class="field-inline"
+                >排序
+                <select id="sortSelect">
+                  <option value="name">文件名</option>
+                  <option value="date">修改日期</option>
+                  <option value="size">文件大小</option>
+                  <option value="type">文件类型</option>
+                </select>
+              </label>
+              <select id="sortOrder" aria-label="排序方向">
+                <option value="asc">升序</option>
+                <option value="desc">降序</option>
+              </select>
+              <div class="field-inline">
+                <span>缩略图</span>
+                <div
+                  class="segmented"
+                  id="thumbPresetGroup"
+                  role="group"
+                  aria-label="缩略图大小"
+                >
+                  <button
+                    type="button"
+                    class="segmented-btn"
+                    data-thumb-preset="small"
+                  >
+                    小
+                  </button>
+                  <button
+                    type="button"
+                    class="segmented-btn active"
+                    data-thumb-preset="medium"
+                  >
+                    中
+                  </button>
+                  <button
+                    type="button"
+                    class="segmented-btn"
+                    data-thumb-preset="large"
+                  >
+                    大
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <span class="group-label">范围</span>
+              <div
+                class="segmented"
+                id="typeFilterGroup"
+                role="group"
+                aria-label="媒体类型"
+              >
+                <button
+                  type="button"
+                  class="segmented-btn active"
+                  data-type-filter="all"
+                >
+                  全部
+                </button>
+                <button
+                  type="button"
+                  class="segmented-btn"
+                  data-type-filter="image"
+                >
+                  图片
+                </button>
+                <button
+                  type="button"
+                  class="segmented-btn"
+                  data-type-filter="video"
+                >
+                  视频
+                </button>
+              </div>
+              <label class="toggle-field" for="includeSubfolders">
+                <input type="checkbox" id="includeSubfolders" />
+                <span>包含子目录</span>
+              </label>
+            </div>
+
+            <div class="settings-actions">
+              <button id="refreshFolderBtn" class="btn-secondary" type="button">
+                刷新当前目录
+              </button>
+              <button id="clearCacheBtn" class="btn-secondary" type="button">
+                清除缓存
+              </button>
+              <button
+                id="toggleDetailBtn"
+                class="btn-icon active"
+                type="button"
+                title="显示文件详情"
+                aria-label="显示文件详情"
+              >
+                <span class="icon-info" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <section id="contentArea">
+          <div id="galleryWrap">
+            <div id="emptyState">
+              <div class="empty-icon" aria-hidden="true"></div>
+              <h2>开始浏览你的本地素材</h2>
+              <p>
+                点击“打开文件夹”选择本地目录，支持图片与视频混合浏览，并可按类型与目录范围筛选。
+              </p>
+              <div class="empty-tips">
+                <span class="tip-chip">单击选中</span>
+                <span class="tip-chip">双击预览</span>
+                <span class="tip-chip">可筛选图片/视频</span>
+              </div>
+            </div>
+            <div id="gallery"></div>
+          </div>
+
+          <aside id="detailPanel" class="open">
+            <div class="detail-header">
+              <div>
+                <span class="detail-title">文件信息</span>
+              </div>
+              <button
+                id="detailCloseBtn"
+                class="btn-icon btn-icon-sm"
+                type="button"
+                aria-label="关闭详情面板"
+              >
+                <span class="icon-close" aria-hidden="true"></span>
+              </button>
+            </div>
+            <div id="detailContent"></div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <div id="modal">
+      <button
+        class="modal-close"
+        id="modalClose"
+        type="button"
+        aria-label="关闭预览"
+      >
+        <span class="icon-close" aria-hidden="true"></span>
+      </button>
+      <button
+        class="modal-nav"
+        id="modalPrev"
+        type="button"
+        aria-label="上一项"
+      >
+        <span class="icon-arrow-left" aria-hidden="true"></span>
+      </button>
+      <button
+        class="modal-nav"
+        id="modalNext"
+        type="button"
+        aria-label="下一项"
+      >
+        <span class="icon-arrow-right" aria-hidden="true"></span>
+      </button>
+      <img id="modalMedia" alt="" />
+      <div id="modalVideo" class="xgplayer-host"></div>
+      <div class="modal-info" id="modalInfo"></div>
+    </div>
+
+    <div id="loadingOverlay">
+      <div class="loading-spinner"></div>
+      <span id="loadingLabel">正在加载文件...</span>
+    </div>
+    <div id="toast"></div>
+
+    <script src="js/vendor/exif.js"></script>
+    <script src="js/vendor/xgplayer/dist/index.min.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
