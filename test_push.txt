@@ -1,1 +1,1 @@
-测试推送权限
+test push permission
