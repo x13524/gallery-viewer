@@ -50,13 +50,6 @@
             </button>
             <div class="path-meta">
               <div id="pathDisplay" class="breadcrumb">未选择文件夹</div>
-              <div class="toolbar-stats">
-                <span class="stat-pill" id="fileCount">0 个文件</span>
-                <span class="stat-pill" id="selectionStatus">未选中</span>
-                <span class="stat-pill" id="cacheStatus" title="缩略图缓存占用"
-                  >缓存 0 MB / 256 MB</span
-                >
-              </div>
             </div>
             <label class="search-field" for="searchInput">
               <span class="search-icon" aria-hidden="true"></span>
@@ -66,11 +59,39 @@
                 placeholder="搜索文件名、后缀"
               />
             </label>
+            <div class="toolbar-quick-actions">
+              <button
+                id="toggleDetailBtn"
+                class="btn-icon active"
+                type="button"
+                title="显示文件详情"
+                aria-label="显示文件详情"
+              >
+                <span class="icon-info" aria-hidden="true"></span>
+              </button>
+              <button
+                id="settingsBtn"
+                class="btn-icon"
+                type="button"
+                title="高级设置"
+                aria-label="高级设置"
+                aria-expanded="false"
+              >
+                <span class="icon-settings" aria-hidden="true"></span>
+              </button>
+            </div>
           </div>
 
-          <div id="settingsRow" class="toolbar-settings">
-            <div class="settings-group">
-              <span class="group-label">视图</span>
+          <div class="toolbar-filters">
+            <div class="toolbar-status-inline">
+              <span class="stat-pill" id="fileCount">0 个文件</span>
+              <span class="stat-pill" id="selectionStatus">未选中</span>
+              <span class="stat-pill" id="cacheStatus" title="缩略图缓存占用"
+                >缓存 0 MB / 256 MB</span
+              >
+            </div>
+
+            <div class="settings-group compact toolbar-filter-group">
               <label class="field-inline"
                 >排序
                 <select id="sortSelect">
@@ -84,6 +105,9 @@
                 <option value="asc">升序</option>
                 <option value="desc">降序</option>
               </select>
+            </div>
+
+            <div class="settings-group compact toolbar-filter-group">
               <div class="field-inline">
                 <span>缩略图</span>
                 <div
@@ -117,8 +141,7 @@
               </div>
             </div>
 
-            <div class="settings-group">
-              <span class="group-label">范围</span>
+            <div class="settings-group compact toolbar-filter-group">
               <div
                 class="segmented"
                 id="typeFilterGroup"
@@ -147,30 +170,82 @@
                   视频
                 </button>
               </div>
-              <label class="toggle-field" for="includeSubfolders">
-                <input type="checkbox" id="includeSubfolders" />
-                <span>包含子目录</span>
-              </label>
             </div>
 
-            <div class="settings-actions">
-              <button id="refreshFolderBtn" class="btn-secondary" type="button">
-                刷新当前目录
-              </button>
-              <button id="clearCacheBtn" class="btn-secondary" type="button">
-                清除缓存
-              </button>
+            <label class="toggle-field toolbar-toggle" for="includeSubfolders">
+              <input type="checkbox" id="includeSubfolders" />
+              <span>包含子目录</span>
+            </label>
+          </div>
+
+          <div id="settingsPanel" class="settings-panel" hidden>
+            <section id="restoreNotice" class="settings-menu-group restore-group" hidden>
+              <span class="group-label">上次目录</span>
+              <div class="restore-copy compact">
+                <strong id="restoreTitle">检测到上次打开的文件夹</strong>
+                <span id="restoreText">可恢复或清除这次记录。</span>
+              </div>
+              <div class="restore-actions">
+                <button id="restoreLastBtn" class="btn-secondary" type="button">
+                  恢复上次目录
+                </button>
+                <button id="skipRestoreBtn" class="btn-secondary" type="button">
+                  暂不恢复
+                </button>
+                <button id="forgetRestoreBtn" class="btn-secondary" type="button">
+                  忘记上次目录
+                </button>
+              </div>
+            </section>
+
+            <section class="settings-menu-group">
+              <span class="group-label">浏览范围</span>
+              <label class="toggle-field settings-menu-toggle" for="autoRestoreLastFolder">
+                <input type="checkbox" id="autoRestoreLastFolder" />
+                <span>启动时自动恢复上次目录</span>
+              </label>
+              <label class="toggle-field settings-menu-toggle" for="excludeCommonDirs">
+                <input type="checkbox" id="excludeCommonDirs" checked />
+                <span>排除工程目录</span>
+              </label>
+            </section>
+
+            <section class="settings-menu-group">
+              <span class="group-label">维护操作</span>
+              <div class="settings-menu-actions">
+                <button id="refreshFolderBtn" class="btn-secondary" type="button">
+                  刷新当前目录
+                </button>
+                <button id="clearCacheBtn" class="btn-secondary" type="button">
+                  清除缓存
+                </button>
+                <button id="forgetSavedFolderBtn" class="btn-secondary" type="button">
+                  忘记上次目录
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <div id="scanProgress" class="scan-progress" hidden>
+            <div class="scan-progress-head">
+              <div class="scan-progress-copy">
+                <strong id="scanProgressLabel">正在扫描目录...</strong>
+                <span id="scanProgressMeta">已发现 0 个文件</span>
+              </div>
               <button
-                id="toggleDetailBtn"
-                class="btn-icon active"
+                id="cancelScanInlineBtn"
+                class="btn-secondary"
                 type="button"
-                title="显示文件详情"
-                aria-label="显示文件详情"
+                hidden
               >
-                <span class="icon-info" aria-hidden="true"></span>
+                取消扫描
               </button>
             </div>
+            <div class="scan-progress-track" aria-hidden="true">
+              <span id="scanProgressBar" class="scan-progress-bar"></span>
+            </div>
           </div>
+
         </header>
 
         <section id="contentArea">
@@ -243,6 +318,10 @@
     <div id="loadingOverlay">
       <div class="loading-spinner"></div>
       <span id="loadingLabel">正在加载文件...</span>
+      <span id="loadingHint" class="loading-hint">大型目录扫描可能需要一些时间。</span>
+      <button id="cancelLoadingBtn" class="btn-secondary" type="button" hidden>
+        取消本次加载
+      </button>
     </div>
     <div id="toast"></div>
 

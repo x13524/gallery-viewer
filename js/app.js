@@ -11,6 +11,24 @@ const SEARCH_DEBOUNCE_MS = 240;
 const GALLERY_BATCH_SIZE = 120;
 const LOOP_YIELD_EVERY = 160;
 const LARGE_FOLDER_THRESHOLD = 1200;
+const COLLECT_CHUNK_SIZE = 80;
+const GALLERY_SKELETON_COUNT = 12;
+const INLINE_SCAN_PROGRESS_THRESHOLD = 40;
+const IGNORED_DIR_NAMES = new Set([
+  '.git',
+  '.hg',
+  '.svn',
+  'node_modules',
+  'dist',
+  'build',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.cache',
+  'out',
+  'target',
+]);
 const CACHE_MAX_BYTES = 256 * 1024 * 1024;
 const CACHE_WARN_BYTES = 224 * 1024 * 1024;
 const CACHE_TRIM_TARGET_BYTES = 192 * 1024 * 1024;
@@ -63,7 +81,9 @@ const state = {
   thumbSize: THUMB_PRESETS.medium,
   searchQuery: '',
   typeFilter: 'all',
+  autoRestoreLastFolder: false,
   includeSubfolders: false,
+  excludeCommonDirs: true,
 
   detailPanelOpen: true,
   preloaded: {},
@@ -71,11 +91,22 @@ const state = {
   openItemPath: '',
   renderToken: 0,
   detailRenderToken: 0,
+  detailItemPath: '',
 
   cacheBytes: 0,
   cacheItems: 0,
   cacheWarningShown: false,
   largeFolderMode: false,
+  pendingRestoreHandle: null,
+  pendingRestoreName: '',
+  activeScanId: 0,
+  cancelScanRequested: false,
+  loadingCancelable: false,
+  scanVisible: false,
+  scanPhase: 'idle',
+  scanFoundCount: 0,
+  scanTotalCount: 0,
+  settingsPanelOpen: false,
 };
 
 let toastTimer = null;
@@ -143,6 +174,23 @@ function formatDuration(seconds) {
 function formatDate(ts) {
   if (!Number.isFinite(ts) || ts <= 0) return '--';
   return new Date(ts).toLocaleString('zh-CN');
+}
+
+function isIgnoredDirectory(name) {
+  return IGNORED_DIR_NAMES.has(String(name || '').toLowerCase());
+}
+
+function makeTaskAbortError() {
+  const error = new Error('Task aborted');
+  error.name = 'AbortError';
+  error.isTaskAbort = true;
+  return error;
+}
+
+function ensureScanActive(scanId) {
+  if (scanId !== state.activeScanId || state.cancelScanRequested) {
+    throw makeTaskAbortError();
+  }
 }
 
 function revokeDetailVideoUrl() {
@@ -268,19 +316,162 @@ async function maybeYield(counter, every = LOOP_YIELD_EVERY) {
   }
 }
 
-function showLoading() {
+function showLoading(message = '正在加载文件...', options = {}) {
   clearTimeout(loadingTimer);
-  const text = arguments[0] || '正在加载文件...';
+  const { cancelable = false, hint = '' } = options;
+  const overlay = document.getElementById('loadingOverlay');
+  const label = document.getElementById('loadingLabel');
+  const hintEl = document.getElementById('loadingHint');
+  const cancelBtn = document.getElementById('cancelLoadingBtn');
+  state.loadingCancelable = cancelable;
+  if (label) label.textContent = message;
+  if (hintEl) {
+    hintEl.textContent =
+      hint ||
+      (cancelable
+        ? '大型目录扫描期间可随时取消，本次操作不会破坏当前页面里已经打开的内容。'
+        : '正在处理，请稍候。');
+  }
+  if (cancelBtn) {
+    cancelBtn.hidden = !cancelable;
+    cancelBtn.disabled = false;
+    cancelBtn.textContent = '取消本次加载';
+  }
+  if (overlay.classList.contains('show')) return;
   loadingTimer = setTimeout(() => {
-    const label = document.getElementById('loadingLabel');
-    if (label) label.textContent = text;
-    document.getElementById('loadingOverlay').classList.add('show');
+    overlay.classList.add('show');
   }, 360);
 }
 
 function hideLoading() {
   clearTimeout(loadingTimer);
-  document.getElementById('loadingOverlay').classList.remove('show');
+  state.loadingCancelable = false;
+  const overlay = document.getElementById('loadingOverlay');
+  const cancelBtn = document.getElementById('cancelLoadingBtn');
+  if (cancelBtn) {
+    cancelBtn.hidden = true;
+    cancelBtn.disabled = false;
+    cancelBtn.textContent = '取消本次加载';
+  }
+  overlay.classList.remove('show');
+}
+
+function beginScanTask(message) {
+  state.activeScanId += 1;
+  state.cancelScanRequested = false;
+  startTreeScanProgress();
+  showLoading(message, { cancelable: true });
+  return state.activeScanId;
+}
+
+function finishScanTask(scanId) {
+  if (scanId !== state.activeScanId) return;
+  state.cancelScanRequested = false;
+  hideLoading();
+  completeScanProgress();
+}
+
+function cancelCurrentScan() {
+  if (!state.loadingCancelable && !state.scanVisible) return;
+  state.cancelScanRequested = true;
+  if (state.loadingCancelable) {
+    showLoading('正在取消当前加载...', {
+      cancelable: true,
+      hint: '会在本轮扫描让出主线程时尽快停止，并保留当前页面内容。',
+    });
+  }
+  const cancelBtn = document.getElementById('cancelLoadingBtn');
+  const inlineCancelBtn = document.getElementById('cancelScanInlineBtn');
+  if (cancelBtn) {
+    cancelBtn.disabled = true;
+    cancelBtn.textContent = '正在取消...';
+  }
+  if (inlineCancelBtn) {
+    inlineCancelBtn.disabled = true;
+    inlineCancelBtn.textContent = '正在取消...';
+  }
+  renderScanProgress();
+}
+
+function renderScanProgress() {
+  const container = document.getElementById('scanProgress');
+  const label = document.getElementById('scanProgressLabel');
+  const meta = document.getElementById('scanProgressMeta');
+  const bar = document.getElementById('scanProgressBar');
+  const cancelBtn = document.getElementById('cancelScanInlineBtn');
+  if (!container || !label || !meta || !bar || !cancelBtn) return;
+
+  if (!state.scanVisible) {
+    container.hidden = true;
+    cancelBtn.hidden = true;
+    cancelBtn.disabled = false;
+    cancelBtn.textContent = '取消扫描';
+    bar.classList.remove('is-indeterminate');
+    bar.style.width = '0';
+    return;
+  }
+
+  container.hidden = false;
+  cancelBtn.hidden = false;
+  cancelBtn.disabled = state.cancelScanRequested;
+  cancelBtn.textContent = state.cancelScanRequested ? '正在取消...' : '取消扫描';
+
+  if (state.scanPhase === 'building-tree') {
+    label.textContent = '正在扫描目录结构...';
+    meta.textContent = state.excludeCommonDirs
+      ? '已启用工程目录排除，正在准备文件列表。'
+      : '正在遍历目录结构并统计可浏览媒体。';
+    bar.classList.add('is-indeterminate');
+    bar.style.width = '34%';
+    return;
+  }
+
+  const total = state.scanTotalCount;
+  const found = state.scanFoundCount;
+  label.textContent = '正在逐步加载文件列表...';
+  meta.textContent = total > 0
+    ? `已发现 ${found} / ${total} 个媒体文件，当前展示 ${state.currentFiles.length} 个`
+    : `已发现 ${found} 个媒体文件，当前展示 ${state.currentFiles.length} 个`;
+  bar.classList.toggle('is-indeterminate', total <= 0);
+  if (total > 0) {
+    const ratio = Math.max(0, Math.min(1, found / total));
+    bar.style.width = `${Math.max(4, Math.round(ratio * 100))}%`;
+  } else {
+    bar.style.width = '34%';
+  }
+}
+
+function startTreeScanProgress() {
+  state.scanVisible = false;
+  state.scanPhase = 'building-tree';
+  state.scanFoundCount = 0;
+  state.scanTotalCount = 0;
+  renderScanProgress();
+}
+
+function startCollectScanProgress(totalCount) {
+  state.scanVisible = totalCount >= INLINE_SCAN_PROGRESS_THRESHOLD || state.largeFolderMode;
+  state.scanPhase = 'collecting';
+  state.scanFoundCount = 0;
+  state.scanTotalCount = Number.isFinite(totalCount) ? totalCount : 0;
+  renderScanProgress();
+}
+
+function updateCollectScanProgress(foundCount) {
+  state.scanFoundCount = foundCount;
+  if (state.scanTotalCount > 0 && foundCount >= state.scanTotalCount) {
+    completeScanProgress();
+    return;
+  }
+  renderScanProgress();
+}
+
+function completeScanProgress() {
+  state.scanVisible = false;
+  state.scanPhase = 'idle';
+  state.scanFoundCount = 0;
+  state.scanTotalCount = 0;
+  renderScanProgress();
 }
 
 function toast(message) {
@@ -528,6 +719,22 @@ async function loadDirectoryHandle() {
   });
 }
 
+async function clearSavedDirectoryHandle() {
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(HANDLE_STORE, 'readwrite');
+    tx.objectStore(HANDLE_STORE).delete('last-folder');
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      resolve();
+    };
+  });
+}
+
 function savePrefs() {
   const prefs = {
     sidebarMode: state.sidebarMode,
@@ -536,7 +743,9 @@ function savePrefs() {
     thumbPreset: state.thumbPreset,
     detailPanelOpen: state.detailPanelOpen,
     typeFilter: state.typeFilter,
+    autoRestoreLastFolder: state.autoRestoreLastFolder,
     includeSubfolders: state.includeSubfolders,
+    excludeCommonDirs: state.excludeCommonDirs,
     lastActiveFolderPath: state.lastActiveFolderPath,
   };
   localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
@@ -553,7 +762,9 @@ function loadPrefs() {
     if (prefs.sortOrder === 'asc' || prefs.sortOrder === 'desc') state.sortOrder = prefs.sortOrder;
     if (typeof prefs.detailPanelOpen === 'boolean') state.detailPanelOpen = prefs.detailPanelOpen;
     if (['all', 'image', 'video'].includes(prefs.typeFilter)) state.typeFilter = prefs.typeFilter;
+    if (typeof prefs.autoRestoreLastFolder === 'boolean') state.autoRestoreLastFolder = prefs.autoRestoreLastFolder;
     if (typeof prefs.includeSubfolders === 'boolean') state.includeSubfolders = prefs.includeSubfolders;
+    if (typeof prefs.excludeCommonDirs === 'boolean') state.excludeCommonDirs = prefs.excludeCommonDirs;
     if (typeof prefs.lastActiveFolderPath === 'string') state.lastActiveFolderPath = prefs.lastActiveFolderPath;
 
     if (prefs.thumbPreset && THUMB_PRESETS[prefs.thumbPreset]) {
@@ -574,7 +785,9 @@ function syncControlsFromState() {
 
   document.getElementById('sortSelect').value = state.sortKey;
   document.getElementById('sortOrder').value = state.sortOrder;
+  document.getElementById('autoRestoreLastFolder').checked = state.autoRestoreLastFolder;
   document.getElementById('includeSubfolders').checked = state.includeSubfolders;
+  document.getElementById('excludeCommonDirs').checked = state.excludeCommonDirs;
   document.getElementById('searchInput').value = state.searchQuery;
 
   document.querySelectorAll('#typeFilterGroup .segmented-btn').forEach((btn) => {
@@ -587,8 +800,59 @@ function syncControlsFromState() {
 
   const detailPanel = document.getElementById('detailPanel');
   const toggleBtn = document.getElementById('toggleDetailBtn');
+  const settingsBtn = document.getElementById('settingsBtn');
   detailPanel.classList.toggle('open', state.detailPanelOpen);
   toggleBtn.classList.toggle('active', state.detailPanelOpen);
+  settingsBtn?.classList.toggle('active', state.settingsPanelOpen);
+  settingsBtn?.setAttribute('aria-expanded', state.settingsPanelOpen ? 'true' : 'false');
+  renderSettingsPanelState();
+}
+
+function renderRestoreNotice() {
+  const notice = document.getElementById('restoreNotice');
+  if (!notice) return;
+  if (!state.pendingRestoreHandle || state.rootHandle) {
+    notice.hidden = true;
+    renderSettingsPanelState();
+    return;
+  }
+  const folderName = state.pendingRestoreName || state.pendingRestoreHandle.name || '未命名文件夹';
+  document.getElementById('restoreTitle').textContent = `检测到上次打开的文件夹：${folderName}`;
+  document.getElementById('restoreText').textContent = '可手动恢复，或直接忘记这次记录。';
+  notice.hidden = false;
+  renderSettingsPanelState();
+}
+
+function clearRestoreNotice() {
+  state.pendingRestoreHandle = null;
+  state.pendingRestoreName = '';
+  renderRestoreNotice();
+}
+
+async function forgetLastFolder(toastMessage = true) {
+  await clearSavedDirectoryHandle();
+  clearRestoreNotice();
+  if (!state.rootHandle) {
+    state.lastActiveFolderPath = '';
+    savePrefs();
+  }
+  if (toastMessage) toast('已忘记上次目录');
+}
+
+function renderSettingsPanelState() {
+  const panel = document.getElementById('settingsPanel');
+  const forgetBtn = document.getElementById('forgetSavedFolderBtn');
+  if (!panel) return;
+  panel.hidden = !state.settingsPanelOpen;
+  if (forgetBtn) {
+    forgetBtn.disabled = !(state.rootHandle || state.pendingRestoreHandle || state.lastActiveFolderPath);
+  }
+}
+
+function setSettingsPanelOpen(open) {
+  if (state.settingsPanelOpen === open) return;
+  state.settingsPanelOpen = open;
+  syncControlsFromState();
 }
 
 async function setDetailPanelOpen(open) {
@@ -603,7 +867,8 @@ async function setDetailPanelOpen(open) {
   }
 }
 
-async function buildFolderTree(dirHandle, parentPath = '', depth = 0) {
+async function buildFolderTree(dirHandle, parentPath = '', depth = 0, scanId = state.activeScanId) {
+  ensureScanActive(scanId);
   const path = parentPath ? `${parentPath}/${dirHandle.name}` : dirHandle.name;
   const node = {
     name: dirHandle.name,
@@ -621,15 +886,18 @@ async function buildFolderTree(dirHandle, parentPath = '', depth = 0) {
   let counter = 0;
   try {
     for await (const [name, handle] of dirHandle.entries()) {
+      ensureScanActive(scanId);
       entries.push({ name, handle });
       counter += 1;
       await maybeYield(counter);
     }
-  } catch {
+  } catch (error) {
+    if (error?.isTaskAbort) throw error;
     return node;
   }
 
   for (const entry of entries) {
+    ensureScanActive(scanId);
     if (entry.handle.kind === 'file' && isMediaFile(entry.name)) {
       node.fileCount += 1;
       node.hasMedia = true;
@@ -643,7 +911,13 @@ async function buildFolderTree(dirHandle, parentPath = '', depth = 0) {
     .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
 
   for (const sub of subDirs) {
-    const child = await buildFolderTree(sub.handle, path, depth + 1);
+    ensureScanActive(scanId);
+    if (state.excludeCommonDirs && isIgnoredDirectory(sub.name)) {
+      counter += 1;
+      await maybeYield(counter);
+      continue;
+    }
+    const child = await buildFolderTree(sub.handle, path, depth + 1, scanId);
     if (child.hasMedia) {
       node.children.push(child);
       node.hasMedia = true;
@@ -672,15 +946,27 @@ function flattenTree(node, list = []) {
   return list;
 }
 
-async function collectMediaFiles(node, includeSubfolders) {
+async function collectMediaFiles(node, includeSubfolders, scanId = state.activeScanId, options = {}) {
+  ensureScanActive(scanId);
+  const { onChunk = null, chunkSize = COLLECT_CHUNK_SIZE } = options;
   const files = [];
+  let pendingChunk = [];
   let counter = 0;
 
+  async function flushChunk(force = false) {
+    if (!onChunk || pendingChunk.length === 0) return;
+    const chunk = pendingChunk;
+    pendingChunk = [];
+    await onChunk(chunk, { foundCount: files.length, force });
+  }
+
   async function collectOne(targetNode) {
+    ensureScanActive(scanId);
     try {
       for await (const [name, handle] of targetNode.handle.entries()) {
+        ensureScanActive(scanId);
         if (handle.kind === 'file' && isMediaFile(name)) {
-          files.push({
+          const fileEntry = {
             name,
             ext: getExt(name),
             handle,
@@ -691,17 +977,27 @@ async function collectMediaFiles(node, includeSubfolders) {
             duration: undefined,
             width: undefined,
             height: undefined,
-          });
+          };
+          files.push(fileEntry);
+          if (onChunk) {
+            pendingChunk.push(fileEntry);
+            if (pendingChunk.length >= chunkSize) {
+              await flushChunk();
+              ensureScanActive(scanId);
+            }
+          }
         }
         counter += 1;
         await maybeYield(counter);
       }
-    } catch {
+    } catch (error) {
+      if (error?.isTaskAbort) throw error;
       // ignore read errors for broken entries
     }
 
     if (!includeSubfolders) return;
     for (const child of targetNode.children) {
+      ensureScanActive(scanId);
       await collectOne(child);
       counter += 1;
       await maybeYield(counter);
@@ -709,6 +1005,7 @@ async function collectMediaFiles(node, includeSubfolders) {
   }
 
   await collectOne(node);
+  await flushChunk(true);
   return files;
 }
 
@@ -732,13 +1029,82 @@ async function ensureMetaForList(files) {
   }
 }
 
-async function openDirectoryHandle(handle) {
-  showLoading('正在打开文件夹...');
-  try {
-    state.rootHandle = handle;
-    state.folderTree = await buildFolderTree(handle);
+function getTargetMediaCount(node, includeSubfolders) {
+  if (!node) return 0;
+  return includeSubfolders ? node.totalMediaCount : node.fileCount;
+}
 
-    if (!state.folderTree?.hasMedia) {
+function prepareProgressiveFolderState(folderTree, targetNode) {
+  state.folderTree = folderTree;
+  state.activeFolderPath = targetNode.path;
+  state.lastActiveFolderPath = targetNode.path;
+  state.currentFolderPath = targetNode.path;
+  state.currentFolderName = targetNode.name;
+  state.allFiles = [];
+  state.currentFiles = [];
+  state.selectedIndex = -1;
+  state.openItemPath = '';
+  state.detailItemPath = '';
+  state.largeFolderMode = getTargetMediaCount(targetNode, state.includeSubfolders) >= LARGE_FOLDER_THRESHOLD;
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('gallery').style.display = '';
+
+  updatePathDisplay();
+  renderSidebar();
+  renderGallery();
+  updateStats();
+  renderDetailEmpty();
+}
+
+async function progressivelyCollectIntoGallery(targetNode, scanId, options = {}) {
+  const preserveSelectionPath = options.preserveSelectionPath || '';
+  const totalCount = getTargetMediaCount(targetNode, state.includeSubfolders);
+  let latestSelectionPath = preserveSelectionPath;
+  let chunkIndex = 0;
+
+  startCollectScanProgress(totalCount);
+  hideLoading();
+  renderGallery();
+  updateStats();
+
+  const allFiles = await collectMediaFiles(targetNode, state.includeSubfolders, scanId, {
+    chunkSize: COLLECT_CHUNK_SIZE,
+    onChunk: async (chunk, meta) => {
+      ensureScanActive(scanId);
+      state.allFiles = state.allFiles.concat(chunk);
+      updateCollectScanProgress(meta.foundCount);
+      await applyFilters({
+        preserveSelectionPath: latestSelectionPath,
+        skipDetail: true,
+      });
+      latestSelectionPath = state.currentFiles[state.selectedIndex]?.path || latestSelectionPath;
+      chunkIndex += 1;
+      await waitForNextFrame();
+    },
+  });
+
+  ensureScanActive(scanId);
+  state.allFiles = allFiles;
+  if (state.scanVisible) completeScanProgress();
+  await applyFilters({ preserveSelectionPath: latestSelectionPath });
+  return allFiles;
+}
+
+async function openDirectoryHandle(handle) {
+  const scanId = beginScanTask('正在打开文件夹...');
+  try {
+    const folderTree = await buildFolderTree(handle, '', 0, scanId);
+
+    if (!folderTree?.hasMedia) {
+      ensureScanActive(scanId);
+      state.rootHandle = handle;
+      state.folderTree = folderTree;
+      state.activeFolderPath = folderTree?.path || '';
+      state.lastActiveFolderPath = folderTree?.path || '';
+      state.currentFolderPath = folderTree?.path || '';
+      state.currentFolderName = folderTree?.name || '';
+      state.collapsedPaths.clear();
       document.getElementById('emptyState').style.display = '';
       document.getElementById('gallery').style.display = 'none';
       state.currentFiles = [];
@@ -750,49 +1116,48 @@ async function openDirectoryHandle(handle) {
       updatePathDisplay();
       updateStats();
       renderDetailEmpty();
+      await saveDirectoryHandle(handle);
+      savePrefs();
+      clearRestoreNotice();
       toast('该目录中没有可浏览的图片或视频');
-      return;
+      return true;
     }
 
-    const initialNode = findNodeByPath(state.folderTree, state.lastActiveFolderPath) || state.folderTree;
-    state.activeFolderPath = initialNode.path;
-    state.lastActiveFolderPath = initialNode.path;
-    state.currentFolderPath = initialNode.path;
-    state.currentFolderName = initialNode.name;
+    const initialNode = findNodeByPath(folderTree, state.lastActiveFolderPath) || folderTree;
+    state.rootHandle = handle;
     state.collapsedPaths.clear();
-
-    state.allFiles = await collectMediaFiles(initialNode, state.includeSubfolders);
-    state.currentFiles = [];
-    state.selectedIndex = -1;
-    state.openItemPath = '';
-    state.largeFolderMode = state.allFiles.length >= LARGE_FOLDER_THRESHOLD;
+    prepareProgressiveFolderState(folderTree, initialNode);
 
     await saveDirectoryHandle(handle);
     savePrefs();
-
-    document.getElementById('emptyState').style.display = 'none';
-    document.getElementById('gallery').style.display = '';
-
-    updatePathDisplay();
-    renderSidebar();
-    await applyFilters();
+    clearRestoreNotice();
+    const allFiles = await progressivelyCollectIntoGallery(initialNode, scanId);
 
     if (state.largeFolderMode) {
-      toast(`已进入大型目录模式，当前共发现 ${state.allFiles.length} 个媒体文件`);
+      toast(`已进入大型目录模式，当前共发现 ${allFiles.length} 个媒体文件`);
     }
+    return true;
   } catch (error) {
+    if (error?.isTaskAbort) {
+      if (scanId === state.activeScanId && state.cancelScanRequested) {
+        toast('已取消当前加载');
+      }
+      return false;
+    }
     if (error?.name !== 'AbortError') {
       console.error(error);
       toast('打开文件夹失败');
     }
+    return false;
   } finally {
-    hideLoading();
+    finishScanTask(scanId);
   }
 }
 
 async function openFolder() {
   try {
     const handle = await window.showDirectoryPicker({ mode: 'read', id: 'gallery-viewer' });
+    clearRestoreNotice();
     await openDirectoryHandle(handle);
   } catch (error) {
     if (error?.name !== 'AbortError') {
@@ -803,25 +1168,22 @@ async function openFolder() {
 }
 
 async function navigateToFolder(node) {
-  showLoading('正在切换文件夹...');
+  const scanId = beginScanTask('正在切换文件夹...');
   try {
-    state.activeFolderPath = node.path;
-    state.lastActiveFolderPath = node.path;
-    state.currentFolderPath = node.path;
-    state.currentFolderName = node.name;
+    prepareProgressiveFolderState(state.folderTree, node);
     savePrefs();
-
-    state.allFiles = await collectMediaFiles(node, state.includeSubfolders);
-    state.currentFiles = [];
-    state.selectedIndex = -1;
-    state.openItemPath = '';
-    state.largeFolderMode = state.allFiles.length >= LARGE_FOLDER_THRESHOLD;
-
-    updatePathDisplay();
-    renderSidebar();
-    await applyFilters();
+    await progressivelyCollectIntoGallery(node, scanId);
+  } catch (error) {
+    if (error?.isTaskAbort) {
+      if (scanId === state.activeScanId && state.cancelScanRequested) {
+        toast('已取消当前加载');
+      }
+      return;
+    }
+    console.error(error);
+    toast('切换文件夹失败');
   } finally {
-    hideLoading();
+    finishScanTask(scanId);
   }
 }
 
@@ -831,14 +1193,20 @@ async function refreshCurrentFolder() {
     return;
   }
 
-  showLoading('正在刷新当前目录...');
+  const scanId = beginScanTask('正在刷新当前目录...');
   const previousFolderPath = state.activeFolderPath || state.lastActiveFolderPath;
   const previousSelectedPath = state.currentFiles[state.selectedIndex]?.path || '';
 
   try {
-    state.folderTree = await buildFolderTree(state.rootHandle);
+    const folderTree = await buildFolderTree(state.rootHandle, '', 0, scanId);
 
-    if (!state.folderTree?.hasMedia) {
+    if (!folderTree?.hasMedia) {
+      ensureScanActive(scanId);
+      state.folderTree = folderTree;
+      state.activeFolderPath = folderTree?.path || '';
+      state.lastActiveFolderPath = folderTree?.path || '';
+      state.currentFolderPath = folderTree?.path || '';
+      state.currentFolderName = folderTree?.name || '';
       document.getElementById('emptyState').style.display = '';
       document.getElementById('gallery').style.display = 'none';
       state.currentFiles = [];
@@ -850,29 +1218,18 @@ async function refreshCurrentFolder() {
       updatePathDisplay();
       updateStats();
       renderDetailEmpty();
+      savePrefs();
       toast('当前目录中没有可浏览的图片或视频');
       return;
     }
 
-    const targetNode = findNodeByPath(state.folderTree, previousFolderPath) || state.folderTree;
-    state.activeFolderPath = targetNode.path;
-    state.lastActiveFolderPath = targetNode.path;
-    state.currentFolderPath = targetNode.path;
-    state.currentFolderName = targetNode.name;
+    const targetNode = findNodeByPath(folderTree, previousFolderPath) || folderTree;
+    state.folderTree = folderTree;
+    prepareProgressiveFolderState(folderTree, targetNode);
     savePrefs();
-
-    state.allFiles = await collectMediaFiles(targetNode, state.includeSubfolders);
-    state.currentFiles = [];
-    state.selectedIndex = -1;
-    state.openItemPath = '';
-    state.largeFolderMode = state.allFiles.length >= LARGE_FOLDER_THRESHOLD;
-
-    document.getElementById('emptyState').style.display = 'none';
-    document.getElementById('gallery').style.display = '';
-
-    updatePathDisplay();
-    renderSidebar();
-    await applyFilters();
+    await progressivelyCollectIntoGallery(targetNode, scanId, {
+      preserveSelectionPath: previousSelectedPath,
+    });
 
     if (previousSelectedPath) {
       const nextIndex = state.currentFiles.findIndex((file) => file.path === previousSelectedPath);
@@ -883,10 +1240,16 @@ async function refreshCurrentFolder() {
 
     toast('当前目录已刷新');
   } catch (error) {
+    if (error?.isTaskAbort) {
+      if (scanId === state.activeScanId && state.cancelScanRequested) {
+        toast('已取消当前加载');
+      }
+      return;
+    }
     console.error(error);
     toast('刷新当前目录失败');
   } finally {
-    hideLoading();
+    finishScanTask(scanId);
   }
 }
 
@@ -938,6 +1301,7 @@ function buildFolderItem(node, relativeText) {
   item.className = 'folder-item';
   item.classList.add(`depth-${Math.min(node.depth, 4)}`);
   item.dataset.path = node.path;
+  item.style.setProperty('--folder-depth', String(Math.min(node.depth, 4)));
   item.title = node.path;
 
   item.innerHTML = `
@@ -1016,7 +1380,9 @@ function renderFlatSidebar(container) {
   });
 }
 
-async function applyFilters() {
+async function applyFilters(options = {}) {
+  const preserveSelectionPath = options.preserveSelectionPath ?? state.currentFiles[state.selectedIndex]?.path ?? '';
+  const skipDetail = Boolean(options.skipDetail);
   let files = [...state.allFiles];
   const query = state.searchQuery.trim().toLowerCase();
 
@@ -1052,7 +1418,10 @@ async function applyFilters() {
   });
 
   state.currentFiles = files;
-  if (state.selectedIndex < 0 && files.length > 0) {
+  if (preserveSelectionPath) {
+    const nextIndex = files.findIndex((file) => file.path === preserveSelectionPath);
+    state.selectedIndex = nextIndex >= 0 ? nextIndex : (files.length > 0 ? 0 : -1);
+  } else if (state.selectedIndex < 0 && files.length > 0) {
     state.selectedIndex = 0;
   }
   if (state.selectedIndex >= files.length) state.selectedIndex = files.length - 1;
@@ -1060,8 +1429,12 @@ async function applyFilters() {
   renderGallery();
   updateStats();
 
+  if (skipDetail) return;
   if (state.selectedIndex >= 0) {
-    await renderDetail(state.selectedIndex);
+    const selectedPath = state.currentFiles[state.selectedIndex]?.path || '';
+    if (state.detailItemPath !== selectedPath) {
+      await renderDetail(state.selectedIndex);
+    }
   } else {
     renderDetailEmpty();
   }
@@ -1080,6 +1453,7 @@ function updateStats() {
   } else {
     sel.textContent = '未选中';
   }
+  renderScanProgress();
 }
 
 function setupObserver() {
@@ -1104,6 +1478,7 @@ function setupObserver() {
 function createGalleryCard(file, index) {
   const card = document.createElement('article');
   card.className = 'thumb-card';
+  card.classList.add('is-pending');
   if (index === state.selectedIndex) card.classList.add('selected');
   if (file.path === state.openItemPath) card.classList.add('is-open');
   card.dataset.index = String(index);
@@ -1138,14 +1513,43 @@ function createGalleryCard(file, index) {
   return card;
 }
 
+function createGallerySkeletonCard(index) {
+  const card = document.createElement('article');
+  card.className = 'thumb-card is-pending';
+  card.dataset.skeleton = String(index);
+  card.innerHTML = `
+    <div class="thumb-img-wrap"></div>
+    <div class="thumb-body">
+      <div class="thumb-name">正在准备文件...</div>
+      <div class="thumb-meta">
+        <span class="thumb-dimension">尺寸读取中...</span>
+        <span class="thumb-size">--</span>
+      </div>
+    </div>
+  `;
+  return card;
+}
+
 function renderGallery() {
   const gallery = document.getElementById('gallery');
   const token = ++state.renderToken;
   gallery.innerHTML = '';
   applyGalleryDensity();
-  gallery.style.gridTemplateColumns = 'repeat(auto-fit, minmax(min(100%, var(--thumb-min-col-w)), 1fr))';
+  const singleMode = state.currentFiles.length === 1;
+  gallery.classList.toggle('is-single', singleMode);
+  gallery.style.gridTemplateColumns = singleMode
+    ? 'minmax(0, 420px)'
+    : 'repeat(auto-fit, minmax(min(100%, var(--thumb-min-col-w)), 1fr))';
 
   if (state.currentFiles.length === 0) {
+    if (state.scanVisible && state.scanPhase === 'collecting') {
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < GALLERY_SKELETON_COUNT; i += 1) {
+        fragment.appendChild(createGallerySkeletonCard(i));
+      }
+      gallery.appendChild(fragment);
+      return;
+    }
     const msg = document.createElement('div');
     msg.className = 'gallery-message';
     msg.textContent = state.searchQuery || state.typeFilter !== 'all'
@@ -1191,8 +1595,39 @@ async function loadThumbForCard(card) {
   const wrap = card.querySelector('.thumb-img-wrap');
   const dimensionLabel = card.querySelector('.thumb-dimension');
   const sizeLabel = card.querySelector('.thumb-size');
+  if (!wrap) return;
 
-  await ensureCardVisualMeta(file);
+  const thumbPromise = generateThumb(file, isVideo(file.name));
+  const metaPromise = ensureCardVisualMeta(file);
+
+  const thumbURL = await thumbPromise;
+  if (card.dataset.index !== String(index) || !card.isConnected) {
+    if (thumbURL) URL.revokeObjectURL(thumbURL);
+    return;
+  }
+
+  if (thumbURL) {
+    const img = document.createElement('img');
+    img.className = 'thumb-img';
+    img.loading = 'lazy';
+    img.src = thumbURL;
+    img.alt = file.name;
+    img.draggable = false;
+    img.addEventListener('load', () => {
+      img.classList.add('is-ready');
+      URL.revokeObjectURL(thumbURL);
+    }, { once: true });
+    img.addEventListener('error', () => {
+      URL.revokeObjectURL(thumbURL);
+    }, { once: true });
+    wrap.appendChild(img);
+  }
+
+  card.classList.remove('is-pending');
+
+  await metaPromise;
+  if (card.dataset.index !== String(index) || !card.isConnected) return;
+
   if (dimensionLabel) {
     if (isVideo(file.name)) {
       const durationText = formatDuration(file.duration);
@@ -1210,26 +1645,6 @@ async function loadThumbForCard(card) {
     sizeLabel.textContent = formatSize(file.size);
     sizeLabel.title = sizeLabel.textContent;
   }
-
-  const thumbURL = await generateThumb(file, isVideo(file.name));
-  if (!thumbURL) {
-    return;
-  }
-
-  const img = document.createElement('img');
-  img.className = 'thumb-img';
-  img.loading = 'lazy';
-  img.src = thumbURL;
-  img.alt = file.name;
-  img.draggable = false;
-  img.addEventListener('load', () => {
-    img.classList.add('is-ready');
-    URL.revokeObjectURL(thumbURL);
-  }, { once: true });
-  img.addEventListener('error', () => {
-    URL.revokeObjectURL(thumbURL);
-  }, { once: true });
-  wrap.appendChild(img);
 }
 
 async function ensureCardVisualMeta(file) {
@@ -1379,6 +1794,7 @@ async function selectFile(index, focusCard = false) {
 
 function renderDetailEmpty() {
   state.detailRenderToken += 1;
+  state.detailItemPath = '';
   destroyDetailPlayer();
   const content = document.getElementById('detailContent');
   content.innerHTML = `
@@ -1475,6 +1891,7 @@ async function renderDetail(index) {
     renderDetailEmpty();
     return;
   }
+  state.detailItemPath = file.path;
 
   const content = document.getElementById('detailContent');
   destroyDetailPlayer();
@@ -1762,23 +2179,64 @@ async function updateFolderScope() {
   const node = findNodeByPath(state.folderTree, state.activeFolderPath);
   if (!node) return;
 
-  showLoading('正在更新浏览范围...');
+  const scanId = beginScanTask('正在更新浏览范围...');
   try {
-    state.allFiles = await collectMediaFiles(node, state.includeSubfolders);
+    state.allFiles = [];
     state.currentFiles = [];
     state.selectedIndex = -1;
     state.openItemPath = '';
-    state.largeFolderMode = state.allFiles.length >= LARGE_FOLDER_THRESHOLD;
+    state.detailItemPath = '';
+    state.largeFolderMode = getTargetMediaCount(node, state.includeSubfolders) >= LARGE_FOLDER_THRESHOLD;
+    renderDetailEmpty();
+    renderGallery();
     updateStats();
-    await applyFilters();
+    await progressivelyCollectIntoGallery(node, scanId);
+  } catch (error) {
+    if (error?.isTaskAbort) {
+      if (scanId === state.activeScanId && state.cancelScanRequested) {
+        toast('已取消当前加载');
+      }
+      return;
+    }
+    console.error(error);
+    toast('更新浏览范围失败');
   } finally {
-    hideLoading();
+    finishScanTask(scanId);
   }
 }
 
 function bindEvents() {
   document.getElementById('openBtn').addEventListener('click', openFolder);
   document.getElementById('refreshFolderBtn').addEventListener('click', refreshCurrentFolder);
+  document.getElementById('cancelLoadingBtn').addEventListener('click', cancelCurrentScan);
+  document.getElementById('cancelScanInlineBtn').addEventListener('click', cancelCurrentScan);
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    setSettingsPanelOpen(!state.settingsPanelOpen);
+  });
+  document.getElementById('restoreLastBtn').addEventListener('click', async () => {
+    const handle = state.pendingRestoreHandle;
+    if (!handle) return;
+    try {
+      const options = { mode: 'read' };
+      let permission = await handle.queryPermission(options);
+      if (permission === 'prompt') permission = await handle.requestPermission(options);
+      if (permission !== 'granted') {
+        toast('未授予目录读取权限');
+        return;
+      }
+      const opened = await openDirectoryHandle(handle);
+      if (opened) toast('已恢复上次打开的文件夹');
+    } catch {
+      await forgetLastFolder(false);
+      toast('上次目录已失效，已帮你清除恢复记录');
+    }
+  });
+  document.getElementById('skipRestoreBtn').addEventListener('click', () => {
+    clearRestoreNotice();
+  });
+  document.getElementById('forgetRestoreBtn').addEventListener('click', async () => {
+    await forgetLastFolder(true);
+  });
 
   document.getElementById('treeViewBtn').addEventListener('click', () => {
     state.sidebarMode = 'tree';
@@ -1804,6 +2262,11 @@ function bindEvents() {
     state.sortOrder = event.target.value;
     savePrefs();
     await applyFilters();
+  });
+
+  document.getElementById('autoRestoreLastFolder').addEventListener('change', (event) => {
+    state.autoRestoreLastFolder = event.target.checked;
+    savePrefs();
   });
 
   document.querySelectorAll('#thumbPresetGroup .segmented-btn').forEach((btn) => {
@@ -1838,6 +2301,14 @@ function bindEvents() {
     await updateFolderScope();
   });
 
+  document.getElementById('excludeCommonDirs').addEventListener('change', async (event) => {
+    state.excludeCommonDirs = event.target.checked;
+    savePrefs();
+    if (state.rootHandle) {
+      await refreshCurrentFolder();
+    }
+  });
+
   document.getElementById('clearCacheBtn').addEventListener('click', async () => {
     await clearThumbCache();
     state.cacheBytes = 0;
@@ -1845,6 +2316,9 @@ function bindEvents() {
     renderCacheStatus();
     toast('缩略图缓存已清除');
     renderGallery();
+  });
+  document.getElementById('forgetSavedFolderBtn').addEventListener('click', async () => {
+    await forgetLastFolder(true);
   });
 
   document.getElementById('toggleDetailBtn').addEventListener('click', async () => {
@@ -1861,6 +2335,14 @@ function bindEvents() {
 
   document.getElementById('modal').addEventListener('click', (event) => {
     if (event.target === event.currentTarget) closeModal();
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!state.settingsPanelOpen) return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.closest('#settingsPanel') || target.closest('#settingsBtn')) return;
+    setSettingsPanelOpen(false);
   });
 
   const modalImg = document.getElementById('modalMedia');
@@ -1910,6 +2392,18 @@ function bindEvents() {
   window.addEventListener('keydown', async (event) => {
 
     const modalOpen = state.modalIndex >= 0;
+
+    if ((state.loadingCancelable || state.scanVisible) && event.key === 'Escape') {
+      event.preventDefault();
+      cancelCurrentScan();
+      return;
+    }
+
+    if (state.settingsPanelOpen && event.key === 'Escape') {
+      event.preventDefault();
+      setSettingsPanelOpen(false);
+      return;
+    }
 
     if (modalOpen) {
       if (event.key === 'Escape') {
@@ -1978,25 +2472,31 @@ async function tryRestoreLastFolder() {
   try {
     const handle = await loadDirectoryHandle();
     if (!handle) return;
-
-    const options = { mode: 'read' };
-    let permission = await handle.queryPermission(options);
-    if (permission === 'prompt') permission = await handle.requestPermission(options);
-    if (permission !== 'granted') return;
-
-    await openDirectoryHandle(handle);
-    toast('已自动恢复上次打开的文件夹');
+    const permission = await handle.queryPermission({ mode: 'read' });
+    if (state.autoRestoreLastFolder && permission === 'granted') {
+      state.pendingRestoreHandle = null;
+      state.pendingRestoreName = '';
+      renderRestoreNotice();
+      const opened = await openDirectoryHandle(handle);
+      if (!opened) return;
+      toast('已自动恢复上次打开的文件夹');
+      return;
+    }
+    state.pendingRestoreHandle = handle;
+    state.pendingRestoreName = handle.name || '';
+    renderRestoreNotice();
   } catch {
-    // ignore stale handles
+    await forgetLastFolder(false);
   }
 }
 
 function init() {
   loadPrefs();
-  syncControlsFromState();
   bindEvents();
+  syncControlsFromState();
   renderDetailEmpty();
   renderCacheStatus();
+  renderRestoreNotice();
   updateStats();
   scheduleCacheAudit(10);
   tryRestoreLastFolder().catch(() => {});
