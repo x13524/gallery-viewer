@@ -28,6 +28,22 @@ const IGNORED_DIR_NAMES = new Set([
   '.cache',
   'out',
   'target',
+  'cache',
+  'caches',
+  'temp',
+  'tmp',
+  'thumbs',
+  'thumbnails',
+  '.thumbnails',
+  '.thumbs',
+  '.icloud',
+  'cloudphotos',
+  'photodata',
+  'albumdata',
+  '.nomedia',
+  'lost+found',
+  'system volume information',
+  'recycle',
 ]);
 const CACHE_MAX_BYTES = 256 * 1024 * 1024;
 const CACHE_WARN_BYTES = 224 * 1024 * 1024;
@@ -84,6 +100,7 @@ const state = {
   autoRestoreLastFolder: true,
   includeSubfolders: false,
   excludeCommonDirs: true,
+  customExcludedDirs: '',
 
   detailPanelOpen: true,
   preloaded: {},
@@ -103,6 +120,7 @@ const state = {
   cancelScanRequested: false,
   loadingCancelable: false,
   scanVisible: false,
+  currentScanningPath: '',
   scanPhase: 'idle',
   scanFoundCount: 0,
   scanTotalCount: 0,
@@ -176,8 +194,25 @@ function formatDate(ts) {
   return new Date(ts).toLocaleString('zh-CN');
 }
 
+let cachedCustomExcludedDirs = new Set();
+let cachedCustomExcludedHash = '';
+
+function getCustomExcludedDirs() {
+  const hash = state.customExcludedDirs || '';
+  if (hash !== cachedCustomExcludedHash) {
+    cachedCustomExcludedHash = hash;
+    cachedCustomExcludedDirs = hash.trim()
+      ? new Set(hash.split(/[,，;\n]+/).map(s => s.trim().toLowerCase()).filter(Boolean))
+      : new Set();
+  }
+  return cachedCustomExcludedDirs;
+}
+
 function isIgnoredDirectory(name) {
-  return IGNORED_DIR_NAMES.has(String(name || '').toLowerCase());
+  const dirName = String(name || '').toLowerCase();
+  if (dirName.startsWith('.')) return true;
+  if (IGNORED_DIR_NAMES.has(dirName)) return true;
+  return getCustomExcludedDirs().has(dirName);
 }
 
 function makeTaskAbortError() {
@@ -418,9 +453,16 @@ function renderScanProgress() {
 
   if (state.scanPhase === 'building-tree') {
     label.textContent = '正在扫描目录结构...';
-    meta.textContent = state.excludeCommonDirs
-      ? '已启用工程目录排除，正在准备文件列表。'
+    let metaText = state.excludeCommonDirs
+      ? '已启用目录排除，正在准备文件列表。'
       : '正在遍历目录结构并统计可浏览媒体。';
+    if (state.currentScanningPath) {
+      const displayPath = state.currentScanningPath.length > 50
+        ? '...' + state.currentScanningPath.slice(-47)
+        : state.currentScanningPath;
+      metaText += ` 当前: ${displayPath}`;
+    }
+    meta.textContent = metaText;
     bar.classList.add('is-indeterminate');
     bar.style.width = '34%';
     return;
@@ -746,6 +788,7 @@ function savePrefs() {
     autoRestoreLastFolder: state.autoRestoreLastFolder,
     includeSubfolders: state.includeSubfolders,
     excludeCommonDirs: state.excludeCommonDirs,
+    customExcludedDirs: state.customExcludedDirs,
     lastActiveFolderPath: state.lastActiveFolderPath,
   };
   localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
@@ -765,6 +808,7 @@ function loadPrefs() {
     if (typeof prefs.autoRestoreLastFolder === 'boolean') state.autoRestoreLastFolder = prefs.autoRestoreLastFolder;
     if (typeof prefs.includeSubfolders === 'boolean') state.includeSubfolders = prefs.includeSubfolders;
     if (typeof prefs.excludeCommonDirs === 'boolean') state.excludeCommonDirs = prefs.excludeCommonDirs;
+    if (typeof prefs.customExcludedDirs === 'string') state.customExcludedDirs = prefs.customExcludedDirs;
     if (typeof prefs.lastActiveFolderPath === 'string') state.lastActiveFolderPath = prefs.lastActiveFolderPath;
 
     if (prefs.thumbPreset && THUMB_PRESETS[prefs.thumbPreset]) {
@@ -788,6 +832,7 @@ function syncControlsFromState() {
   document.getElementById('autoRestoreLastFolder').checked = state.autoRestoreLastFolder;
   document.getElementById('includeSubfolders').checked = state.includeSubfolders;
   document.getElementById('excludeCommonDirs').checked = state.excludeCommonDirs;
+  document.getElementById('customExcludedDirsInput').value = state.customExcludedDirs;
   document.getElementById('searchInput').value = state.searchQuery;
 
   document.querySelectorAll('#typeFilterGroup .segmented-btn').forEach((btn) => {
@@ -867,9 +912,26 @@ async function setDetailPanelOpen(open) {
   }
 }
 
+const PARALLEL_SCAN_LIMIT = 8;
+const SCAN_PROGRESS_UPDATE_INTERVAL = 200;
+let lastProgressUpdate = 0;
+
+function updateScanProgressUI() {
+  const now = Date.now();
+  if (now - lastProgressUpdate < SCAN_PROGRESS_UPDATE_INTERVAL) return;
+  lastProgressUpdate = now;
+  if (state.scanPhase === 'building-tree') {
+    renderScanProgress();
+  }
+}
+
 async function buildFolderTree(dirHandle, parentPath = '', depth = 0, scanId = state.activeScanId) {
   ensureScanActive(scanId);
   const path = parentPath ? `${parentPath}/${dirHandle.name}` : dirHandle.name;
+  
+  state.currentScanningPath = path;
+  updateScanProgressUI();
+  
   const node = {
     name: dirHandle.name,
     path,
@@ -889,7 +951,10 @@ async function buildFolderTree(dirHandle, parentPath = '', depth = 0, scanId = s
       ensureScanActive(scanId);
       entries.push({ name, handle });
       counter += 1;
-      await maybeYield(counter);
+      if (counter % 200 === 0) {
+        updateScanProgressUI();
+        await waitForNextFrame();
+      }
     }
   } catch (error) {
     if (error?.isTaskAbort) throw error;
@@ -902,32 +967,61 @@ async function buildFolderTree(dirHandle, parentPath = '', depth = 0, scanId = s
       node.fileCount += 1;
       node.hasMedia = true;
     }
-    counter += 1;
-    await maybeYield(counter);
   }
 
   const subDirs = entries
     .filter((entry) => entry.handle.kind === 'directory')
+    .filter((entry) => !state.excludeCommonDirs || !isIgnoredDirectory(entry.name))
     .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
 
-  for (const sub of subDirs) {
-    ensureScanActive(scanId);
-    if (state.excludeCommonDirs && isIgnoredDirectory(sub.name)) {
+  if (depth < 3 && subDirs.length > 1) {
+    const results = await parallelBatchProcess(subDirs, scanId, path, depth);
+    for (const child of results) {
+      if (child && child.hasMedia) {
+        node.children.push(child);
+        node.hasMedia = true;
+      }
+    }
+  } else {
+    for (const sub of subDirs) {
+      ensureScanActive(scanId);
+      const child = await buildFolderTree(sub.handle, path, depth + 1, scanId);
+      if (child.hasMedia) {
+        node.children.push(child);
+        node.hasMedia = true;
+      }
       counter += 1;
-      await maybeYield(counter);
-      continue;
+      if (counter % 100 === 0) {
+        updateScanProgressUI();
+        await waitForNextFrame();
+      }
     }
-    const child = await buildFolderTree(sub.handle, path, depth + 1, scanId);
-    if (child.hasMedia) {
-      node.children.push(child);
-      node.hasMedia = true;
-    }
-    counter += 1;
-    await maybeYield(counter);
   }
 
   node.totalMediaCount = node.fileCount + node.children.reduce((sum, child) => sum + child.totalMediaCount, 0);
   return node;
+}
+
+async function parallelBatchProcess(dirs, scanId, parentPath, depth) {
+  const results = [];
+  const batchSize = Math.min(PARALLEL_SCAN_LIMIT, dirs.length);
+  
+  for (let i = 0; i < dirs.length; i += batchSize) {
+    ensureScanActive(scanId);
+    const batch = dirs.slice(i, i + batchSize);
+    
+    const promises = batch.map(async (sub) => {
+      ensureScanActive(scanId);
+      return buildFolderTree(sub.handle, parentPath, depth + 1, scanId);
+    });
+    
+    const batchResults = await Promise.all(promises);
+    results.push(...batchResults);
+    
+    await waitForNextFrame();
+  }
+  
+  return results;
 }
 
 function findNodeByPath(node, path) {
@@ -2387,6 +2481,17 @@ function bindEvents() {
   document.getElementById('excludeCommonDirs').addEventListener('change', async (event) => {
     state.excludeCommonDirs = event.target.checked;
     savePrefs();
+    if (state.rootHandle) {
+      await refreshCurrentFolder();
+    }
+  });
+
+  document.getElementById('customExcludedDirsInput').addEventListener('input', async (event) => {
+    state.customExcludedDirs = event.target.value;
+    savePrefs();
+  });
+
+  document.getElementById('customExcludedDirsInput').addEventListener('change', async () => {
     if (state.rootHandle) {
       await refreshCurrentFolder();
     }
